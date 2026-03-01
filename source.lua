@@ -1309,7 +1309,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								end
 								
 								local button = finity:Create("TextButton", {
-									BackgroundColor3 = isSelected and theme.dropdown_background or Color3.new(1, 1, 1),
+									BackgroundColor3 = theme.dropdown_background,
 									BackgroundTransparency = isSelected and 0.3 or 1,
 									BorderSizePixel = 0,
 									Size = UDim2.new(1, 0, 0, 20),
@@ -1367,6 +1367,8 @@ function finity.new(isdark, gprojectName, thinProject)
 									
 									-- Update button visual state without closing dropdown
 									local currentSelected = not found
+									-- Ensure background color is set correctly
+									button.BackgroundColor3 = theme.dropdown_background
 									finity.gs["TweenService"]:Create(button, TweenInfo.new(0.2), {
 										BackgroundTransparency = currentSelected and 0.3 or 1
 									}):Play()
@@ -1381,6 +1383,8 @@ function finity.new(isdark, gprojectName, thinProject)
 													break
 												end
 											end
+											-- Ensure background color is set correctly
+											btn.BackgroundColor3 = theme.dropdown_background
 											finity.gs["TweenService"]:Create(btn, TweenInfo.new(0.2), {
 												BackgroundTransparency = btnIsSelected and 0.3 or 1
 											}):Play()
