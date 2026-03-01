@@ -117,7 +117,7 @@ finity.keybinds.connections = {}
 finity.keybinds.keyStates = {} -- Track last pressed state for each key
 finity.keybinds.lastTriggerTime = {} -- Track last trigger time for debouncing
 
--- Register a keybind using ContextActionService (intercepts keys even when game processes them)
+-- Register a keybind using polling (doesn't block game input)
 function finity.keybinds:Register(key, callback, name)
 	if not key or not callback then 
 		warn("Finity Keybind: Invalid key or callback")
@@ -140,63 +140,72 @@ function finity.keybinds:Register(key, callback, name)
 		return false
 	end
 	
-	-- Use ContextActionService to intercept the key at high priority
-	local CAS = finity.gs["ContextActionService"]
-	if CAS then
-		local actionName = "FinityKeybind_" .. bindId
+	-- Use polling with IsKeyDown (doesn't interfere with game input)
+	local UIS = finity.gs["UserInputService"]
+	local RunService = finity.gs["RunService"]
+	
+	if UIS and RunService then
+		local wasDown = false
+		local checkInterval = 0
 		
-		-- Bind action with highest priority to intercept before game processes it
-		CAS:BindActionAtPriority(
-			actionName,
-			function(actionName, inputState, inputObject)
-				-- Only trigger on press (not release)
-				if inputState == Enum.UserInputState.Begin then
-					-- Check chat
-					if isChatOpen() then
-						return Enum.ContextActionResult.Pass
-					end
-					
+		-- Create a connection that polls for key state
+		local connection = RunService.Heartbeat:Connect(function()
+			-- Throttle: check every 3 frames for performance
+			checkInterval = checkInterval + 1
+			if checkInterval < 3 then
+				return
+			end
+			checkInterval = 0
+			
+			-- Skip if chat is open
+			if isChatOpen() then
+				wasDown = false
+				return
+			end
+			
+			-- Check key state
+			local success, isDown = pcall(function()
+				return UIS:IsKeyDown(key)
+			end)
+			
+			if success then
+				-- Edge detection: key just pressed (wasn't down, now is down)
+				if isDown and not wasDown then
 					-- Debounce: prevent rapid firing (50ms minimum)
 					local currentTime = tick()
 					local lastTrigger = self.lastTriggerTime[bindId] or 0
-					if currentTime - lastTrigger < 0.05 then
-						return Enum.ContextActionResult.Sink
+					if currentTime - lastTrigger >= 0.05 then
+						self.lastTriggerTime[bindId] = currentTime
+						
+						-- Call the callback
+						if callback then
+							task.spawn(function()
+								local success2, err = pcall(callback, key)
+								if not success2 then
+									warn("Keybind error (" .. bindId .. "):", err)
+								end
+							end)
+						end
 					end
-					self.lastTriggerTime[bindId] = currentTime
-					
-					-- Call the callback
-					if callback then
-						task.spawn(function()
-							local success, err = pcall(callback, key)
-							if not success then
-								warn("Keybind error (" .. bindId .. "):", err)
-							end
-						end)
-					end
-					
-					-- Sink the input so game doesn't process it
-					return Enum.ContextActionResult.Sink
 				end
-				return Enum.ContextActionResult.Pass
-			end,
-			false,
-			Enum.ContextActionPriority.High.Value, -- High priority (2000)
-			key
-		)
+				wasDown = isDown
+			end
+		end)
 		
-	self.binds[bindId] = {
-		key = key,
-		callback = callback,
-		name = bindId,
-		actionName = actionName
-	}
-	
-	self.keyStates[bindId] = false
-	self.lastTriggerTime[bindId] = 0
-	
+		self.binds[bindId] = {
+			key = key,
+			callback = callback,
+			name = bindId,
+			connection = connection
+		}
+		
+		self.keyStates[bindId] = false
+		self.lastTriggerTime[bindId] = 0
+		self.connections[bindId] = connection
+		
 		return bindId
 	else
-		warn("Finity Keybind: ContextActionService not available")
+		warn("Finity Keybind: UserInputService or RunService not available")
 		return nil
 	end
 end
@@ -206,7 +215,12 @@ function finity.keybinds:Unregister(bindId)
 	if self.binds[bindId] then
 		local bindData = self.binds[bindId]
 		
-		-- Unbind from ContextActionService
+		-- Disconnect the polling connection
+		if bindData.connection and typeof(bindData.connection) == "RBXScriptConnection" then
+			bindData.connection:Disconnect()
+		end
+		
+		-- Legacy: Unbind from ContextActionService if it exists
 		local CAS = finity.gs["ContextActionService"]
 		if CAS and bindData.actionName then
 			CAS:UnbindAction(bindData.actionName)
@@ -246,12 +260,40 @@ function finity.keybinds:UnregisterByFrame(frameRef, prefix)
 	
 	-- Check both bindId and bindData.name for frame reference
 	for bindId, bindData in pairs(self.binds) do
-		-- Check if bindId ends with the frame reference
-		if string.find(bindId, frameStr, 1, true) then
+		-- Check if bindId contains the frame reference
+		if bindId and string.find(bindId, frameStr, 1, true) then
 			table.insert(toRemove, bindId)
 		-- Also check bindData.name if it exists
 		elseif bindData and bindData.name and string.find(bindData.name, frameStr, 1, true) then
 			table.insert(toRemove, bindId)
+		end
+	end
+	
+	-- Also unregister by key if we have the same key registered for this frame
+	-- This ensures we catch any keybinds that might have been registered with different IDs
+	for _, bindId in ipairs(toRemove) do
+		self:Unregister(bindId)
+	end
+end
+
+-- Unregister all keybinds for a specific key (useful when changing keybinds)
+function finity.keybinds:UnregisterByKey(key, frameRef)
+	if not key then return end
+	
+	local toRemove = {}
+	for bindId, bindData in pairs(self.binds) do
+		if bindData.key == key then
+			-- If frameRef is provided, only unregister if it matches
+			if not frameRef then
+				table.insert(toRemove, bindId)
+			else
+				local frameStr = "_" .. tostring(frameRef)
+				if bindId and string.find(bindId, frameStr, 1, true) then
+					table.insert(toRemove, bindId)
+				elseif bindData.name and string.find(bindData.name, frameStr, 1, true) then
+					table.insert(toRemove, bindId)
+				end
+			end
 		end
 	end
 	
@@ -949,14 +991,19 @@ function finity.new(isdark, gprojectName, thinProject)
 
 							-- Setup keybind listener for toggling checkbox using global keybind manager
 							local function setupKeybindListener()
-								-- Unregister ALL keybinds for this cheat element first
+								-- Unregister ALL keybinds for this cheat element first (by frame)
 								finity.keybinds:UnregisterByFrame(cheat.frame, "FinityCheckbox")
 								
-								-- Also clear the stored connection
+								-- Also unregister by key to catch any old keybinds
+								if keybindData.key then
+									finity.keybinds:UnregisterByKey(keybindData.key, cheat.frame)
+								end
+								
+								-- Clear the stored connection
 								keybindConnection = nil
 								
 								if keybindData.key and not waitingForInput then
-									-- Use global keybind manager with separate thread - works with ALL keys
+									-- Use global keybind manager with polling - doesn't block game input
 									local bindId = "FinityCheckbox_" .. tostring(keybindData.key) .. "_" .. tostring(cheat.frame)
 									keybindConnection = finity.keybinds:Register(keybindData.key, function(key)
 										if not waitingForInput then
@@ -1082,18 +1129,16 @@ function finity.new(isdark, gprojectName, thinProject)
 													return
 												elseif keyCode == Enum.KeyCode.Backspace then
 													-- Clear keybind
+													local oldKey = keybindData.key
 													keybindData.key = nil
 													waitingForInput = false
 													updateKeybindText()
 													
-													if keybindConnection then
-														if typeof(keybindConnection) == "RBXScriptConnection" then
-															keybindConnection:Disconnect()
-														elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindData.key then
-															finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
-														end
-														keybindConnection = nil
+													-- Unregister old keybind
+													if oldKey then
+														finity.keybinds:UnregisterByKey(oldKey, cheat.frame)
 													end
+													keybindConnection = nil
 													
 													lastKeyPressTime = currentTime
 													
@@ -1114,29 +1159,15 @@ function finity.new(isdark, gprojectName, thinProject)
 								if waitingForInput then return end
 								
 								-- Right click to clear
+								local oldKey = keybindData.key
 								keybindData.key = nil
 								updateKeybindText()
 								
-								if keybindConnection then
-									if typeof(keybindConnection) == "RBXScriptConnection" then
-										keybindConnection:Disconnect()
-									elseif keybindConnection == true and finity.gs["ContextActionService"] then
-										-- Try to unbind with the old key if it exists
-										local oldKey = keybindData.key
-										if not oldKey then
-											-- If key was cleared, we need to track it differently
-											-- Just unbind all Finity keybinds for this cheat
-											pcall(function()
-												for _, key in pairs({Enum.KeyCode.F, Enum.KeyCode.C, Enum.KeyCode.V, Enum.KeyCode.B}) do
-													finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(key))
-												end
-											end)
-										else
-											finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(oldKey))
-										end
-									end
-									keybindConnection = nil
+								-- Unregister old keybind
+								if oldKey then
+									finity.keybinds:UnregisterByKey(oldKey, cheat.frame)
 								end
+								keybindConnection = nil
 							end)
 
 							cheat.keybindText.Parent = cheat.keybindBtn
@@ -2447,14 +2478,19 @@ function finity.new(isdark, gprojectName, thinProject)
 						updateButtonText()
 						
 						local function setupKeybindListener()
-							-- Unregister ALL keybinds for this cheat element first
+							-- Unregister ALL keybinds for this cheat element first (by frame)
 							finity.keybinds:UnregisterByFrame(cheat.frame, "FinityKeybindBtn")
 							
-							-- Also clear the stored connection
+							-- Also unregister by key to catch any old keybinds
+							if keybindKey then
+								finity.keybinds:UnregisterByKey(keybindKey, cheat.frame)
+							end
+							
+							-- Clear the stored connection
 							keybindConnection = nil
 							
 							if keybindKey then
-								-- Use global keybind manager with separate thread - works with ALL keys
+								-- Use global keybind manager with polling - doesn't block game input
 								local bindId = "FinityKeybindBtn_" .. tostring(keybindKey) .. "_" .. tostring(cheat.frame)
 								keybindConnection = finity.keybinds:Register(keybindKey, function(key)
 									if callback then
@@ -2574,19 +2610,17 @@ function finity.new(isdark, gprojectName, thinProject)
 												return
 											elseif keyCode == Enum.KeyCode.Backspace then
 												-- Clear keybind
+												local oldKey = keybindKey
 												keybindKey = nil
 												cheat.value = nil
 												waitingForInput = false
 												updateButtonText()
 												
-												if keybindConnection then
-													if typeof(keybindConnection) == "RBXScriptConnection" then
-														keybindConnection:Disconnect()
-													elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindKey then
-														finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
-													end
-													keybindConnection = nil
+												-- Unregister old keybind
+												if oldKey then
+													finity.keybinds:UnregisterByKey(oldKey, cheat.frame)
 												end
+												keybindConnection = nil
 												
 												lastKeyPressTime = currentTime
 												
@@ -2607,18 +2641,16 @@ function finity.new(isdark, gprojectName, thinProject)
 							if waitingForInput then return end
 							
 							-- Right click to clear
+							local oldKey = keybindKey
 							keybindKey = nil
 							cheat.value = nil
 							updateButtonText()
 							
-							if keybindConnection then
-								if typeof(keybindConnection) == "RBXScriptConnection" then
-									keybindConnection:Disconnect()
-								elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindKey then
-									finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
-								end
-								keybindConnection = nil
+							-- Unregister old keybind
+							if oldKey then
+								finity.keybinds:UnregisterByKey(oldKey, cheat.frame)
 							end
+							keybindConnection = nil
 						end)
 						
 						function cheat:SetKey(key)
