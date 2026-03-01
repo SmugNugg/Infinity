@@ -2034,7 +2034,7 @@ function finity.new(isdark, gprojectName, thinProject)
 						cheat.background.Parent = cheat.container
 						cheat.button.Parent = cheat.container
 					elseif string.lower(kind) == "keybindbutton" or string.lower(kind) == "keybindbtn" then
-						local keybindKey = data and data.key or Enum.KeyCode.None
+						local keybindKey = data and data.key or nil
 						local keybindText = data and data.text or "Keybind"
 						
 						cheat.value = keybindKey
@@ -2061,7 +2061,7 @@ function finity.new(isdark, gprojectName, thinProject)
 							Size = UDim2.new(1, 0, 1, 0),
 							ZIndex = 2,
 							Font = Enum.Font.Gotham,
-							Text = keybindKey ~= Enum.KeyCode.None and (keybindText .. " [" .. tostring(keybindKey.Name) .. "]") or keybindText,
+							Text = keybindKey and (keybindText .. " [" .. tostring(keybindKey.Name) .. "]") or keybindText,
 							TextColor3 = theme.textbox_text,
 							TextSize = 13,
 							TextXAlignment = Enum.TextXAlignment.Center
@@ -2091,16 +2091,16 @@ function finity.new(isdark, gprojectName, thinProject)
 						function cheat:SetKey(key)
 							cheat.value = key
 							keybindKey = key
-							cheat.button.Text = key ~= Enum.KeyCode.None and (keybindText .. " [" .. tostring(key.Name) .. "]") or keybindText
+							cheat.button.Text = key and (keybindText .. " [" .. tostring(key.Name) .. "]") or keybindText
 						end
 						
 						function cheat:SetText(text)
 							keybindText = text
-							cheat.button.Text = keybindKey ~= Enum.KeyCode.None and (keybindText .. " [" .. tostring(keybindKey.Name) .. "]") or keybindText
+							cheat.button.Text = keybindKey and (keybindText .. " [" .. tostring(keybindKey.Name) .. "]") or keybindText
 						end
 						
 						-- Auto-trigger when key is pressed
-						if keybindKey and keybindKey ~= Enum.KeyCode.None then
+						if keybindKey then
 							finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
 								if not Process and Input.KeyCode == keybindKey then
 									if callback then
