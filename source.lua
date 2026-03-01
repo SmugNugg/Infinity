@@ -987,7 +987,7 @@ function finity.new(isdark, gprojectName, thinProject)
 						cheat.list = finity:Create("ScrollingFrame", {
 							Name = "List",
 							BackgroundColor3 = theme.dropdown_background,
-							BackgroundTransparency = 0.5,
+							BackgroundTransparency = 0.2,
 							BorderSizePixel = 0,
 							Position = UDim2.new(0, 0, 1, 0),
 							Size = UDim2.new(1, 0, 0, 100),
@@ -1197,7 +1197,7 @@ function finity.new(isdark, gprojectName, thinProject)
 						cheat.list = finity:Create("ScrollingFrame", {
 							Name = "List",
 							BackgroundColor3 = theme.dropdown_background,
-							BackgroundTransparency = 0.5,
+							BackgroundTransparency = 0.2,
 							BorderSizePixel = 0,
 							Position = UDim2.new(0, 0, 1, 0),
 							Size = UDim2.new(1, 0, 0, 100),
@@ -1227,8 +1227,11 @@ function finity.new(isdark, gprojectName, thinProject)
 								cheat.selected.Text = "None"
 							elseif #cheat.value == 1 then
 								cheat.selected.Text = cheat.value[1]
+							elseif #cheat.value <= 3 then
+								cheat.selected.Text = table.concat(cheat.value, ", ")
 							else
-								cheat.selected.Text = #cheat.value .. " selected"
+								local displayText = table.concat({cheat.value[1], cheat.value[2], cheat.value[3]}, ", ")
+								cheat.selected.Text = displayText .. ", ..."
 							end
 						end
 						
@@ -1238,7 +1241,7 @@ function finity.new(isdark, gprojectName, thinProject)
 							end
 							
 							for _, child in next, cheat.list:GetChildren() do
-								if child:IsA("Frame") then
+								if child:IsA("TextButton") then
 									child:Destroy()
 								end
 							end
@@ -1252,33 +1255,10 @@ function finity.new(isdark, gprojectName, thinProject)
 									end
 								end
 								
-								local optionFrame = finity:Create("Frame", {
-									BackgroundColor3 = Color3.new(1, 1, 1),
-									BackgroundTransparency = 1,
-									Size = UDim2.new(1, 0, 0, 20),
-									ZIndex = 3
-								})
-								
-								local checkbox = finity:Create("ImageLabel", {
-									Name = "Checkbox",
-									AnchorPoint = Vector2.new(0, 0.5),
-									BackgroundColor3 = Color3.new(1, 1, 1),
-									BackgroundTransparency = 1,
-									Position = UDim2.new(0, 5, 0.5, 0),
-									Size = UDim2.new(0, 12, 0, 12),
-									ZIndex = 3,
-									Image = "rbxassetid://3570695787",
-									ImageColor3 = isSelected and theme.checkbox_checked or theme.checkbox_outer,
-									ScaleType = Enum.ScaleType.Slice,
-									SliceCenter = Rect.new(100, 100, 100, 100),
-									SliceScale = 0.04
-								})
-								
 								local button = finity:Create("TextButton", {
-									BackgroundColor3 = Color3.new(1, 1, 1),
-									BackgroundTransparency = 1,
-									Position = UDim2.new(0, 20, 0, 0),
-									Size = UDim2.new(1, -20, 1, 0),
+									BackgroundColor3 = isSelected and theme.dropdown_background or Color3.new(1, 1, 1),
+									BackgroundTransparency = isSelected and 0.3 or 1,
+									Size = UDim2.new(1, 0, 0, 20),
 									ZIndex = 3,
 									Font = Enum.Font.Gotham,
 									Text = value,
@@ -1287,11 +1267,31 @@ function finity.new(isdark, gprojectName, thinProject)
 									TextXAlignment = Enum.TextXAlignment.Left
 								})
 								
+								local uipadding = finity:Create("UIPadding", {
+									PaddingLeft = UDim.new(0, 5)
+								})
+								uipadding.Parent = button
+								
 								button.MouseEnter:Connect(function()
 									finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {TextColor3 = theme.dropdown_text_hover}):Play()
+									if not isSelected then
+										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.7}):Play()
+									end
 								end)
 								button.MouseLeave:Connect(function()
 									finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {TextColor3 = theme.dropdown_text}):Play()
+									local currentSelected = false
+									for _, selected in next, cheat.value do
+										if selected == value then
+											currentSelected = true
+											break
+										end
+									end
+									if not currentSelected then
+										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 1}):Play()
+									else
+										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.3}):Play()
+									end
 								end)
 								button.MouseButton1Click:Connect(function()
 									local found = false
@@ -1308,11 +1308,7 @@ function finity.new(isdark, gprojectName, thinProject)
 									end
 									
 									updateText()
-									
-									local isNowSelected = not found
-									finity.gs["TweenService"]:Create(checkbox, TweenInfo.new(0.2), {
-										ImageColor3 = isNowSelected and theme.checkbox_checked or theme.checkbox_outer
-									}):Play()
+									refreshOptions()
 									
 									if callback then
 										local s, e = pcall(function()
@@ -1322,11 +1318,9 @@ function finity.new(isdark, gprojectName, thinProject)
 									end
 								end)
 								
-								checkbox.Parent = optionFrame
-								button.Parent = optionFrame
-								optionFrame.Parent = cheat.list
+								button.Parent = cheat.list
 								
-								finity.gs["TweenService"]:Create(optionFrame, TweenInfo.new(0), {BackgroundTransparency = 1}):Play()
+								finity.gs["TweenService"]:Create(button, TweenInfo.new(0), {BackgroundTransparency = isSelected and 0.3 or 1}):Play()
 							end
 							
 							finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0), {Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 0), CanvasSize = UDim2.new(0, 0, 0, cheat.list["UIListLayout"].AbsoluteContentSize.Y), ScrollBarImageTransparency = 1, BackgroundTransparency = 1}):Play()
@@ -1336,16 +1330,25 @@ function finity.new(isdark, gprojectName, thinProject)
 							cheat.dropped = not cheat.dropped
 							
 							if cheat.dropped then
-								for _, frame in next, cheat.list:GetChildren() do
-									if frame:IsA("Frame") then
-										finity.gs["TweenService"]:Create(frame, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+								for _, button in next, cheat.list:GetChildren() do
+									if button:IsA("TextButton") then
+										local isSelected = false
+										for _, selected in next, cheat.value do
+											if selected == button.Text then
+												isSelected = true
+												break
+											end
+										end
+										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.2), {
+											BackgroundTransparency = isSelected and 0.3 or 1
+										}):Play()
 									end
 								end
-								finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, math.clamp(cheat.list["UIListLayout"].AbsoluteContentSize.Y, 0, 150)), Position = UDim2.new(0, 0, 1, 0), ScrollBarImageTransparency = 0, BackgroundTransparency = 0.5}):Play()
+								finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, math.clamp(cheat.list["UIListLayout"].AbsoluteContentSize.Y, 0, 150)), Position = UDim2.new(0, 0, 1, 0), ScrollBarImageTransparency = 0, BackgroundTransparency = 0.2}):Play()
 							else
-								for _, frame in next, cheat.list:GetChildren() do
-									if frame:IsA("Frame") then
-										finity.gs["TweenService"]:Create(frame, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+								for _, button in next, cheat.list:GetChildren() do
+									if button:IsA("TextButton") then
+										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
 									end
 								end
 								finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 0), ScrollBarImageTransparency = 1, BackgroundTransparency = 1}):Play()
@@ -1373,201 +1376,6 @@ function finity.new(isdark, gprojectName, thinProject)
 							end
 							updateText()
 							refreshOptions()
-							if callback then
-								local s, e = pcall(function()
-									callback(cheat.value)
-								end)
-								if not s then warn("error: ".. e) end
-							end
-						end
-						
-						cheat.selected.Parent = cheat.dropdown
-						cheat.dropdown.Parent = cheat.container
-						cheat.list.Parent = cheat.container
-					elseif string.lower(kind) == "combodropdown" or string.lower(kind) == "groupeddropdown" then
-						if data then
-							if data.default then
-								cheat.value = data.default
-							else
-								cheat.value = "None"
-							end
-						else
-							cheat.value = "None"
-						end
-						
-						local groups = {}
-						if data and data.groups then
-							groups = data.groups
-						end
-						
-						cheat.dropped = false
-						
-						cheat.dropdown = finity:Create("ImageButton", {
-							Name = "ComboDropdown",
-							BackgroundColor3 = Color3.new(1, 1, 1),
-							BackgroundTransparency = 1,
-							Size = UDim2.new(1, 0, 1, 0),
-							ZIndex = 2,
-							Image = "rbxassetid://3570695787",
-							ImageColor3 = theme.dropdown_background,
-							ImageTransparency = 0.5,
-							ScaleType = Enum.ScaleType.Slice,
-							SliceCenter = Rect.new(100, 100, 100, 100),
-							SliceScale = 0.02
-						})
-						
-						cheat.selected = finity:Create("TextLabel", {
-							Name = "Selected",
-							BackgroundColor3 = Color3.new(1, 1, 1),
-							BackgroundTransparency = 1,
-							Position = UDim2.new(0, 10, 0, 0),
-							Size = UDim2.new(1, -35, 1, 0),
-							ZIndex = 2,
-							Font = Enum.Font.Gotham,
-							Text = tostring(cheat.value),
-							TextColor3 = theme.dropdown_text,
-							TextSize = 13,
-							TextXAlignment = Enum.TextXAlignment.Left
-						})
-						
-						cheat.list = finity:Create("ScrollingFrame", {
-							Name = "List",
-							BackgroundColor3 = theme.dropdown_background,
-							BackgroundTransparency = 0.5,
-							BorderSizePixel = 0,
-							Position = UDim2.new(0, 0, 1, 0),
-							Size = UDim2.new(1, 0, 0, 100),
-							ZIndex = 3,
-							BottomImage = "rbxassetid://967852042",
-							MidImage = "rbxassetid://967852042",
-							TopImage = "rbxassetid://967852042",
-							ScrollBarThickness = 4,
-							VerticalScrollBarInset = Enum.ScrollBarInset.None,
-							ScrollBarImageColor3 = theme.dropdown_scrollbar_color
-						})
-						
-						local uilistlayout = finity:Create("UIListLayout", {
-							SortOrder = Enum.SortOrder.LayoutOrder,
-							Padding = UDim.new(0, 2)
-						})
-						uilistlayout.Parent = cheat.list
-						uilistlayout = nil
-						local uipadding = finity:Create("UIPadding", {
-							PaddingLeft = UDim.new(0, 2)
-						})
-						uipadding.Parent = cheat.list
-						uipadding = nil
-						
-						local function refreshOptions()
-							if cheat.dropped then
-								cheat.fadelist()
-							end
-							
-							for _, child in next, cheat.list:GetChildren() do
-								if child:IsA("Frame") or child:IsA("TextLabel") then
-									child:Destroy()
-								end
-							end
-							
-							for groupName, groupOptions in next, groups do
-								local groupLabel = finity:Create("TextLabel", {
-									BackgroundColor3 = Color3.new(1, 1, 1),
-									BackgroundTransparency = 1,
-									Size = UDim2.new(1, 0, 0, 18),
-									ZIndex = 3,
-									Font = Enum.Font.GothamSemibold,
-									Text = groupName,
-									TextColor3 = theme.text_color,
-									TextSize = 12,
-									TextXAlignment = Enum.TextXAlignment.Left
-								})
-								groupLabel.Parent = cheat.list
-								
-								for _, value in next, groupOptions do
-									local button = finity:Create("TextButton", {
-										BackgroundColor3 = Color3.new(1, 1, 1),
-										BackgroundTransparency = 1,
-										Position = UDim2.new(0, 10, 0, 0),
-										Size = UDim2.new(1, -10, 0, 20),
-										ZIndex = 3,
-										Font = Enum.Font.Gotham,
-										Text = value,
-										TextColor3 = theme.dropdown_text,
-										TextSize = 13,
-										TextXAlignment = Enum.TextXAlignment.Left
-									})
-									
-									button.MouseEnter:Connect(function()
-										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {TextColor3 = theme.dropdown_text_hover}):Play()
-									end)
-									button.MouseLeave:Connect(function()
-										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {TextColor3 = theme.dropdown_text}):Play()
-									end)
-									button.MouseButton1Click:Connect(function()
-										if cheat.dropped then
-											cheat.value = value
-											cheat.selected.Text = value
-											cheat.fadelist()
-											
-											if callback then
-												local s, e = pcall(function()
-													callback(cheat.value, groupName)
-												end)
-												if not s then warn("error: ".. e) end
-											end
-										end
-									end)
-									
-									button.Parent = cheat.list
-									finity.gs["TweenService"]:Create(button, TweenInfo.new(0), {TextTransparency = 1}):Play()
-								end
-							end
-							
-							finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0), {Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 0), CanvasSize = UDim2.new(0, 0, 0, cheat.list["UIListLayout"].AbsoluteContentSize.Y), ScrollBarImageTransparency = 1, BackgroundTransparency = 1}):Play()
-						end
-						
-						function cheat.fadelist()
-							cheat.dropped = not cheat.dropped
-							
-							if cheat.dropped then
-								for _, child in next, cheat.list:GetChildren() do
-									if child:IsA("TextButton") then
-										finity.gs["TweenService"]:Create(child, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
-									elseif child:IsA("TextLabel") then
-										finity.gs["TweenService"]:Create(child, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
-									end
-								end
-								finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, math.clamp(cheat.list["UIListLayout"].AbsoluteContentSize.Y, 0, 200)), Position = UDim2.new(0, 0, 1, 0), ScrollBarImageTransparency = 0, BackgroundTransparency = 0.5}):Play()
-							else
-								for _, child in next, cheat.list:GetChildren() do
-									if child:IsA("TextButton") then
-										finity.gs["TweenService"]:Create(child, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
-									elseif child:IsA("TextLabel") then
-										finity.gs["TweenService"]:Create(child, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
-									end
-								end
-								finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 0), ScrollBarImageTransparency = 1, BackgroundTransparency = 1}):Play()
-							end
-						end
-						
-						cheat.dropdown.MouseEnter:Connect(function()
-							finity.gs["TweenService"]:Create(cheat.selected, TweenInfo.new(0.1), {TextColor3 = theme.dropdown_text_hover}):Play()
-						end)
-						cheat.dropdown.MouseLeave:Connect(function()
-							finity.gs["TweenService"]:Create(cheat.selected, TweenInfo.new(0.1), {TextColor3 = theme.dropdown_text}):Play()
-						end)
-						cheat.dropdown.MouseButton1Click:Connect(function()
-							cheat.fadelist()
-						end)
-						
-						refreshOptions()
-						
-						function cheat:SetValue(value)
-							cheat.selected.Text = value
-							cheat.value = value
-							if cheat.dropped then
-								cheat.fadelist()
-							end
 							if callback then
 								local s, e = pcall(function()
 									callback(cheat.value)
@@ -1656,7 +1464,7 @@ function finity.new(isdark, gprojectName, thinProject)
 						cheat.list = finity:Create("ScrollingFrame", {
 							Name = "List",
 							BackgroundColor3 = theme.dropdown_background,
-							BackgroundTransparency = 0.5,
+							BackgroundTransparency = 0.2,
 							BorderSizePixel = 0,
 							Position = UDim2.new(0, 0, 1, 0),
 							Size = UDim2.new(1, 0, 0, 100),
@@ -1681,23 +1489,6 @@ function finity.new(isdark, gprojectName, thinProject)
 						})
 						uipadding2.Parent = cheat.list
 						uipadding2 = nil
-						
-						local function filterOptions(searchText)
-							searchText = string.lower(searchText or "")
-							cheat.filteredOptions = {}
-							
-							if searchText == "" then
-								cheat.filteredOptions = options
-							else
-								for _, option in next, options do
-									if string.find(string.lower(tostring(option)), searchText) then
-										table.insert(cheat.filteredOptions, option)
-									end
-								end
-							end
-							
-							refreshOptions()
-						end
 						
 						local function refreshOptions()
 							if cheat.dropped then
@@ -1749,7 +1540,27 @@ function finity.new(isdark, gprojectName, thinProject)
 								finity.gs["TweenService"]:Create(button, TweenInfo.new(0), {TextTransparency = 1}):Play()
 							end
 							
-							finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0), {Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 0), CanvasSize = UDim2.new(0, 0, 0, cheat.list["UIListLayout"].AbsoluteContentSize.Y + 24), ScrollBarImageTransparency = 1, BackgroundTransparency = 1}):Play()
+							local listLayout = cheat.list:FindFirstChild("UIListLayout")
+							if listLayout then
+								finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0), {Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 0), CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 24), ScrollBarImageTransparency = 1, BackgroundTransparency = 1}):Play()
+							end
+						end
+						
+						local function filterOptions(searchText)
+							searchText = string.lower(searchText or "")
+							cheat.filteredOptions = {}
+							
+							if searchText == "" then
+								cheat.filteredOptions = options
+							else
+								for _, option in next, options do
+									if string.find(string.lower(tostring(option)), searchText) then
+										table.insert(cheat.filteredOptions, option)
+									end
+								end
+							end
+							
+							refreshOptions()
 						end
 						
 						cheat.searchBox.Changed:Connect(function(property)
@@ -1779,7 +1590,10 @@ function finity.new(isdark, gprojectName, thinProject)
 										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
 									end
 								end
-								finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, math.clamp(cheat.list["UIListLayout"].AbsoluteContentSize.Y + 24, 0, 150)), Position = UDim2.new(0, 0, 1, 0), ScrollBarImageTransparency = 0, BackgroundTransparency = 0.5}):Play()
+								local listLayout = cheat.list:FindFirstChild("UIListLayout")
+								if listLayout then
+									finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, math.clamp(listLayout.AbsoluteContentSize.Y + 24, 0, 150)), Position = UDim2.new(0, 0, 1, 0), ScrollBarImageTransparency = 0, BackgroundTransparency = 0.2}):Play()
+								end
 								finity.gs["TweenService"]:Create(cheat.searchBox, TweenInfo.new(0.2), {BackgroundTransparency = 0.3}):Play()
 							else
 								cheat.searchBox.Visible = false
@@ -2291,6 +2105,88 @@ function finity.new(isdark, gprojectName, thinProject)
 							cheat.button.Text = "Bound to " .. tostring(callback_bind.Name)
 						end
 
+						cheat.background.Parent = cheat.container
+						cheat.button.Parent = cheat.container
+					elseif string.lower(kind) == "keybindbutton" or string.lower(kind) == "keybindbtn" then
+						local keybindKey = data and data.key or Enum.KeyCode.None
+						local keybindText = data and data.text or "Keybind"
+						
+						cheat.value = keybindKey
+						
+						cheat.background = finity:Create("ImageLabel", {
+							Name = "Background",
+							BackgroundColor3 = Color3.new(1, 1, 1),
+							BackgroundTransparency = 1,
+							Size = UDim2.new(1, 0, 1, 0),
+							ZIndex = 2,
+							Image = "rbxassetid://3570695787",
+							ImageColor3 = theme.button_background,
+							ImageTransparency = 0.5,
+							ScaleType = Enum.ScaleType.Slice,
+							SliceCenter = Rect.new(100, 100, 100, 100),
+							SliceScale = 0.02
+						})
+						
+						cheat.button = finity:Create("TextButton", {
+							Name = "Button",
+							BackgroundColor3 = Color3.new(1, 1, 1),
+							BackgroundTransparency = 1,
+							Position = UDim2.new(0, 0, 0, 0),
+							Size = UDim2.new(1, 0, 1, 0),
+							ZIndex = 2,
+							Font = Enum.Font.Gotham,
+							Text = keybindKey ~= Enum.KeyCode.None and (keybindText .. " [" .. tostring(keybindKey.Name) .. "]") or keybindText,
+							TextColor3 = theme.textbox_text,
+							TextSize = 13,
+							TextXAlignment = Enum.TextXAlignment.Center
+						})
+						
+						cheat.button.MouseEnter:Connect(function()
+							finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_hover}):Play()
+						end)
+						cheat.button.MouseLeave:Connect(function()
+							finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
+						end)
+						cheat.button.MouseButton1Down:Connect(function()
+							finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_down}):Play()
+						end)
+						cheat.button.MouseButton1Up:Connect(function()
+							finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
+							
+							if callback then
+								local s, e = pcall(function()
+									callback(keybindKey)
+								end)
+								
+								if not s then warn("error: ".. e) end
+							end
+						end)
+						
+						function cheat:SetKey(key)
+							cheat.value = key
+							keybindKey = key
+							cheat.button.Text = key ~= Enum.KeyCode.None and (keybindText .. " [" .. tostring(key.Name) .. "]") or keybindText
+						end
+						
+						function cheat:SetText(text)
+							keybindText = text
+							cheat.button.Text = keybindKey ~= Enum.KeyCode.None and (keybindText .. " [" .. tostring(keybindKey.Name) .. "]") or keybindText
+						end
+						
+						-- Auto-trigger when key is pressed
+						if keybindKey and keybindKey ~= Enum.KeyCode.None then
+							finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+								if not Process and Input.KeyCode == keybindKey then
+									if callback then
+										local s, e = pcall(function()
+											callback(keybindKey)
+										end)
+										if not s then warn("error: ".. e) end
+									end
+								end
+							end)
+						end
+						
 						cheat.background.Parent = cheat.container
 						cheat.button.Parent = cheat.container
 					end
