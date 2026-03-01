@@ -387,35 +387,32 @@ function finity.new(isdark, gprojectName, thinProject)
 	local dragStart = nil
 	local startPos = nil
 	
-	local dragConnection
-	dragConnection = finity.gs["UserInputService"].InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			local mousePos = finity.gs["UserInputService"]:GetMouseLocation()
-			local containerPos = self2.container.AbsolutePosition
-			local containerSize = self2.container.AbsoluteSize
-			
-			-- Check if click is on the topbar area
-			if mousePos.X >= containerPos.X and mousePos.X <= containerPos.X + containerSize.X and
-			   mousePos.Y >= containerPos.Y and mousePos.Y <= containerPos.Y + 30 then
-				dragging = true
-				dragStart = mousePos
-				startPos = self2.container.Position
-			end
-		end
+	local topbarDrag = finity:Create("TextButton", {
+		Name = "DragHandle",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 30),
+		Position = UDim2.new(0, 0, 0, 0),
+		ZIndex = 10,
+		Text = "",
+		Active = true
+	})
+	
+	topbarDrag.MouseButton1Down:Connect(function()
+		dragging = true
+		dragStart = Vector2.new(mouse.X, mouse.Y)
+		startPos = self2.container.Position
 	end)
 	
-	finity.gs["UserInputService"].InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local mousePos = finity.gs["UserInputService"]:GetMouseLocation()
-			if dragStart and startPos then
-				local delta = mousePos - dragStart
-				local newX = startPos.X.Offset + delta.X
-				local newY = startPos.Y.Offset + delta.Y
-				
-				-- Smooth position update
-				self2.container.Position = UDim2.new(startPos.X.Scale, newX, startPos.Y.Scale, newY)
-			end
+	local moveConnection
+	moveConnection = mouse.Move:Connect(function()
+		if dragging and dragStart and startPos then
+			local deltaX = mouse.X - dragStart.X
+			local deltaY = mouse.Y - dragStart.Y
+			local newX = startPos.X.Offset + deltaX
+			local newY = startPos.Y.Offset + deltaY
+			
+			-- Smooth position update
+			self2.container.Position = UDim2.new(startPos.X.Scale, newX, startPos.Y.Scale, newY)
 		end
 	end)
 	
@@ -1293,10 +1290,7 @@ function finity.new(isdark, gprojectName, thinProject)
 						end
 						
 						local function refreshOptions()
-							if cheat.dropped then
-								cheat.fadelist()
-							end
-							
+							-- Don't close dropdown when refreshing options
 							for _, child in next, cheat.list:GetChildren() do
 								if child:IsA("TextButton") then
 									child:Destroy()
@@ -2034,6 +2028,7 @@ function finity.new(isdark, gprojectName, thinProject)
 	self2.sidebar.Parent = self2.container
 	self2.topbar.Parent = self2.container
 	self2.tip.Parent = self2.topbar
+	topbarDrag.Parent = self2.topbar
 
 	-- Expose config and keybinds
 	self2.config = finity.config
