@@ -149,16 +149,10 @@ function finity.keybinds:Register(key, callback, name)
 		CAS:BindActionAtPriority(
 			actionName,
 			function(actionName, inputState, inputObject)
-				-- Debug: Print all input info
-				print("[Finity Keybind Debug] Action:", actionName, "State:", inputState, "Key:", key.Name, "InputObject:", inputObject)
-				
 				-- Only trigger on press (not release)
 				if inputState == Enum.UserInputState.Begin then
-					print("[Finity Keybind] Key pressed:", key.Name, "BindId:", bindId)
-					
 					-- Check chat
 					if isChatOpen() then
-						print("[Finity Keybind] Chat is open, ignoring key:", key.Name)
 						return Enum.ContextActionResult.Pass
 					end
 					
@@ -166,12 +160,9 @@ function finity.keybinds:Register(key, callback, name)
 					local currentTime = tick()
 					local lastTrigger = self.lastTriggerTime[bindId] or 0
 					if currentTime - lastTrigger < 0.05 then
-						print("[Finity Keybind] Debounced, ignoring:", key.Name)
 						return Enum.ContextActionResult.Sink
 					end
 					self.lastTriggerTime[bindId] = currentTime
-					
-					print("[Finity Keybind] Triggering callback for:", key.Name)
 					
 					-- Call the callback
 					if callback then
@@ -179,13 +170,11 @@ function finity.keybinds:Register(key, callback, name)
 							local success, err = pcall(callback, key)
 							if not success then
 								warn("Keybind error (" .. bindId .. "):", err)
-							else
-								print("[Finity Keybind] Callback executed successfully for:", key.Name)
 							end
 						end)
 					end
 					
-					-- Sink the input so game doesn't process it (optional - remove if you want game to also process)
+					-- Sink the input so game doesn't process it
 					return Enum.ContextActionResult.Sink
 				end
 				return Enum.ContextActionResult.Pass
@@ -194,8 +183,6 @@ function finity.keybinds:Register(key, callback, name)
 			Enum.ContextActionPriority.High.Value, -- High priority (2000)
 			key
 		)
-		
-		print("[Finity Keybind] Registered keybind:", key.Name, "with action:", actionName)
 		
 	self.binds[bindId] = {
 		key = key,
@@ -245,6 +232,30 @@ end
 
 function finity.keybinds:Clear()
 	for bindId, _ in pairs(self.binds) do
+		self:Unregister(bindId)
+	end
+end
+
+-- Unregister all keybinds for a specific cheat element (by frame reference)
+function finity.keybinds:UnregisterByFrame(frameRef, prefix)
+	if not frameRef then return end
+	prefix = prefix or "Finity"
+	
+	local frameStr = "_" .. tostring(frameRef)
+	local toRemove = {}
+	
+	-- Check both bindId and bindData.name for frame reference
+	for bindId, bindData in pairs(self.binds) do
+		-- Check if bindId ends with the frame reference
+		if string.find(bindId, frameStr, 1, true) then
+			table.insert(toRemove, bindId)
+		-- Also check bindData.name if it exists
+		elseif bindData and bindData.name and string.find(bindData.name, frameStr, 1, true) then
+			table.insert(toRemove, bindId)
+		end
+	end
+	
+	for _, bindId in ipairs(toRemove) do
 		self:Unregister(bindId)
 	end
 end
@@ -938,17 +949,11 @@ function finity.new(isdark, gprojectName, thinProject)
 
 							-- Setup keybind listener for toggling checkbox using global keybind manager
 							local function setupKeybindListener()
-								if keybindConnection then
-									-- Unregister from global keybind manager
-									if typeof(keybindConnection) == "string" then
-										finity.keybinds:Unregister(keybindConnection)
-									elseif typeof(keybindConnection) == "RBXScriptConnection" then
-										keybindConnection:Disconnect()
-									elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindData.key then
-										finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
-									end
-									keybindConnection = nil
-								end
+								-- Unregister ALL keybinds for this cheat element first
+								finity.keybinds:UnregisterByFrame(cheat.frame, "FinityCheckbox")
+								
+								-- Also clear the stored connection
+								keybindConnection = nil
 								
 								if keybindData.key and not waitingForInput then
 									-- Use global keybind manager with separate thread - works with ALL keys
@@ -1001,36 +1006,15 @@ function finity.new(isdark, gprojectName, thinProject)
 								waitingForInput = true
 								updateKeybindText()
 								
-								-- Print all currently pressed keys
+								-- Track pressed keys for debugging (only print once per key press)
 								local UIS = finity.gs["UserInputService"]
-								local pressedKeys = {}
-								print("[Finity Keybind] Waiting for keybind input...")
-								
-								-- Function to check and print all pressed keys
-								local function printPressedKeys()
-									local keys = {}
-									for _, keyCode in pairs(Enum.KeyCode:GetEnumItems()) do
-										if keyCode ~= Enum.KeyCode.Unknown then
-											local success, isDown = pcall(function()
-												return UIS:IsKeyDown(keyCode)
-											end)
-											if success and isDown then
-												table.insert(keys, keyCode.Name)
-											end
-										end
-									end
-									if #keys > 0 then
-										print("[Finity Keybind] Currently pressed keys:", table.concat(keys, ", "))
-									end
-								end
-								
-								-- Print pressed keys immediately
-								printPressedKeys()
+								local lastPrintedKeys = {}
 								
 								-- Track previous key states for edge detection
 								local previousKeyStates = {}
 								local lastKeyPressTime = 0
 								local DEBOUNCE_TIME = 0.1 -- 100ms debounce
+								local keyCheckInterval = 0 -- Throttle key checking to every 3 frames
 								
 								-- Continuously check for key presses using IsKeyDown with edge detection
 								local keyCheckConnection
@@ -1043,8 +1027,12 @@ function finity.new(isdark, gprojectName, thinProject)
 										return
 									end
 									
-									-- Print pressed keys for debugging
-									printPressedKeys()
+									-- Throttle: only check keys every 3 frames for performance
+									keyCheckInterval = keyCheckInterval + 1
+									if keyCheckInterval < 3 then
+										return
+									end
+									keyCheckInterval = 0
 									
 									-- Check for new key presses using edge detection
 									local currentTime = tick()
@@ -1052,63 +1040,69 @@ function finity.new(isdark, gprojectName, thinProject)
 										return -- Debounce: ignore rapid presses
 									end
 									
-									-- Check all keys for edge detection
-									for _, keyCode in pairs(Enum.KeyCode:GetEnumItems()) do
-										if keyCode ~= Enum.KeyCode.Unknown then
-											local success, isDown = pcall(function()
-												return UIS:IsKeyDown(keyCode)
-											end)
+									-- Only check common keys instead of all keys for better performance
+									local commonKeys = {
+										Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T, Enum.KeyCode.Y,
+										Enum.KeyCode.U, Enum.KeyCode.I, Enum.KeyCode.O, Enum.KeyCode.P, Enum.KeyCode.A, Enum.KeyCode.S,
+										Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.G, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K,
+										Enum.KeyCode.L, Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V, Enum.KeyCode.B,
+										Enum.KeyCode.N, Enum.KeyCode.M, Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three,
+										Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight,
+										Enum.KeyCode.Nine, Enum.KeyCode.Zero, Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift,
+										Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl, Enum.KeyCode.LeftAlt, Enum.KeyCode.RightAlt,
+										Enum.KeyCode.Space, Enum.KeyCode.Backspace
+									}
+									
+									for _, keyCode in ipairs(commonKeys) do
+										local success, isDown = pcall(function()
+											return UIS:IsKeyDown(keyCode)
+										end)
+										
+										if success then
+											local wasDown = previousKeyStates[keyCode] or false
+											previousKeyStates[keyCode] = isDown
 											
-											if success then
-												local wasDown = previousKeyStates[keyCode] or false
-												previousKeyStates[keyCode] = isDown
-												
-												-- Edge detection: key just pressed (wasn't down, now is down)
-												if isDown and not wasDown then
-													-- Skip toggle key and backspace
-													if keyCode ~= finityData.ToggleKey and keyCode ~= Enum.KeyCode.Backspace then
-														print("[Finity Keybind] Key detected via IsKeyDown:", keyCode.Name)
-														
-														-- Set the keybind
-														keybindData.key = keyCode
-														waitingForInput = false
-														updateKeybindText()
-														setupKeybindListener()
-														
-														lastKeyPressTime = currentTime
-														
-														-- Clean up
-														if keyCheckConnection then
-															keyCheckConnection:Disconnect()
-															keyCheckConnection = nil
-														end
-														return
-													elseif keyCode == Enum.KeyCode.Backspace then
-														-- Clear keybind
-														print("[Finity Keybind] Backspace detected, clearing keybind")
-														
-														keybindData.key = nil
-														waitingForInput = false
-														updateKeybindText()
-														
-														if keybindConnection then
-															if typeof(keybindConnection) == "RBXScriptConnection" then
-																keybindConnection:Disconnect()
-															elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindData.key then
-																finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
-															end
-															keybindConnection = nil
-														end
-														
-														lastKeyPressTime = currentTime
-														
-														-- Clean up
-														if keyCheckConnection then
-															keyCheckConnection:Disconnect()
-															keyCheckConnection = nil
-														end
-														return
+											-- Edge detection: key just pressed (wasn't down, now is down)
+											if isDown and not wasDown then
+												-- Skip toggle key and backspace
+												if keyCode ~= finityData.ToggleKey and keyCode ~= Enum.KeyCode.Backspace then
+													-- Set the keybind
+													keybindData.key = keyCode
+													waitingForInput = false
+													updateKeybindText()
+													setupKeybindListener()
+													
+													lastKeyPressTime = currentTime
+													
+													-- Clean up
+													if keyCheckConnection then
+														keyCheckConnection:Disconnect()
+														keyCheckConnection = nil
 													end
+													return
+												elseif keyCode == Enum.KeyCode.Backspace then
+													-- Clear keybind
+													keybindData.key = nil
+													waitingForInput = false
+													updateKeybindText()
+													
+													if keybindConnection then
+														if typeof(keybindConnection) == "RBXScriptConnection" then
+															keybindConnection:Disconnect()
+														elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindData.key then
+															finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
+														end
+														keybindConnection = nil
+													end
+													
+													lastKeyPressTime = currentTime
+													
+													-- Clean up
+													if keyCheckConnection then
+														keyCheckConnection:Disconnect()
+														keyCheckConnection = nil
+													end
+													return
 												end
 											end
 										end
@@ -2453,17 +2447,11 @@ function finity.new(isdark, gprojectName, thinProject)
 						updateButtonText()
 						
 						local function setupKeybindListener()
-							if keybindConnection then
-								-- Unregister from global keybind manager
-								if typeof(keybindConnection) == "string" then
-									finity.keybinds:Unregister(keybindConnection)
-								elseif typeof(keybindConnection) == "RBXScriptConnection" then
-									keybindConnection:Disconnect()
-								elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindKey then
-									finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
-								end
-								keybindConnection = nil
-							end
+							-- Unregister ALL keybinds for this cheat element first
+							finity.keybinds:UnregisterByFrame(cheat.frame, "FinityKeybindBtn")
+							
+							-- Also clear the stored connection
+							keybindConnection = nil
 							
 							if keybindKey then
 								-- Use global keybind manager with separate thread - works with ALL keys
@@ -2503,35 +2491,14 @@ function finity.new(isdark, gprojectName, thinProject)
 							waitingForInput = true
 							updateButtonText()
 							
-							-- Print all currently pressed keys
+							-- Track pressed keys for debugging
 							local UIS = finity.gs["UserInputService"]
-							print("[Finity Keybind Button] Waiting for keybind input...")
-							
-							-- Function to check and print all pressed keys
-							local function printPressedKeys()
-								local keys = {}
-								for _, keyCode in pairs(Enum.KeyCode:GetEnumItems()) do
-									if keyCode ~= Enum.KeyCode.Unknown then
-										local success, isDown = pcall(function()
-											return UIS:IsKeyDown(keyCode)
-										end)
-										if success and isDown then
-											table.insert(keys, keyCode.Name)
-										end
-									end
-								end
-								if #keys > 0 then
-									print("[Finity Keybind Button] Currently pressed keys:", table.concat(keys, ", "))
-								end
-							end
-							
-							-- Print pressed keys immediately
-							printPressedKeys()
 							
 							-- Track previous key states for edge detection
 							local previousKeyStates = {}
 							local lastKeyPressTime = 0
 							local DEBOUNCE_TIME = 0.1 -- 100ms debounce
+							local keyCheckInterval = 0 -- Throttle key checking to every 3 frames
 							
 							-- Continuously check for key presses using IsKeyDown with edge detection
 							local keyCheckConnection
@@ -2544,8 +2511,12 @@ function finity.new(isdark, gprojectName, thinProject)
 									return
 								end
 								
-								-- Print pressed keys for debugging
-								printPressedKeys()
+								-- Throttle: only check keys every 3 frames for performance
+								keyCheckInterval = keyCheckInterval + 1
+								if keyCheckInterval < 3 then
+									return
+								end
+								keyCheckInterval = 0
 								
 								-- Check for new key presses using edge detection
 								local currentTime = tick()
@@ -2553,72 +2524,78 @@ function finity.new(isdark, gprojectName, thinProject)
 									return -- Debounce: ignore rapid presses
 								end
 								
-								-- Check all keys for edge detection
-								for _, keyCode in pairs(Enum.KeyCode:GetEnumItems()) do
-									if keyCode ~= Enum.KeyCode.Unknown then
-										local success, isDown = pcall(function()
-											return UIS:IsKeyDown(keyCode)
-										end)
+								-- Only check common keys instead of all keys for better performance
+								local commonKeys = {
+									Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T, Enum.KeyCode.Y,
+									Enum.KeyCode.U, Enum.KeyCode.I, Enum.KeyCode.O, Enum.KeyCode.P, Enum.KeyCode.A, Enum.KeyCode.S,
+									Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.G, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K,
+									Enum.KeyCode.L, Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V, Enum.KeyCode.B,
+									Enum.KeyCode.N, Enum.KeyCode.M, Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three,
+									Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight,
+									Enum.KeyCode.Nine, Enum.KeyCode.Zero, Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift,
+									Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl, Enum.KeyCode.LeftAlt, Enum.KeyCode.RightAlt,
+									Enum.KeyCode.Space, Enum.KeyCode.Backspace
+								}
+								
+								for _, keyCode in ipairs(commonKeys) do
+									local success, isDown = pcall(function()
+										return UIS:IsKeyDown(keyCode)
+									end)
+									
+									if success then
+										local wasDown = previousKeyStates[keyCode] or false
+										previousKeyStates[keyCode] = isDown
 										
-										if success then
-											local wasDown = previousKeyStates[keyCode] or false
-											previousKeyStates[keyCode] = isDown
-											
-											-- Edge detection: key just pressed (wasn't down, now is down)
-											if isDown and not wasDown then
-												-- Skip toggle key and backspace
-												if keyCode ~= finityData.ToggleKey and keyCode ~= Enum.KeyCode.Backspace then
-													print("[Finity Keybind Button] Key detected via IsKeyDown:", keyCode.Name)
-													
-													-- Set the keybind
-													keybindKey = keyCode
-													cheat.value = keybindKey
-													waitingForInput = false
-													updateButtonText()
-													setupKeybindListener()
-													
-													if callback then
-														local s, e = pcall(function()
-															callback(keybindKey)
-														end)
-														if not s then warn("error: ".. e) end
-													end
-													
-													lastKeyPressTime = currentTime
-													
-													-- Clean up
-													if keyCheckConnection then
-														keyCheckConnection:Disconnect()
-														keyCheckConnection = nil
-													end
-													return
-												elseif keyCode == Enum.KeyCode.Backspace then
-													-- Clear keybind
-													print("[Finity Keybind Button] Backspace detected, clearing keybind")
-													
-													keybindKey = nil
-													cheat.value = nil
-													waitingForInput = false
-													updateButtonText()
-													
-													if keybindConnection then
-														if typeof(keybindConnection) == "RBXScriptConnection" then
-															keybindConnection:Disconnect()
-														elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindKey then
-															finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
-														end
-														keybindConnection = nil
-													end
-													
-													lastKeyPressTime = currentTime
-													
-													-- Clean up
-													if keyCheckConnection then
-														keyCheckConnection:Disconnect()
-														keyCheckConnection = nil
-													end
-													return
+										-- Edge detection: key just pressed (wasn't down, now is down)
+										if isDown and not wasDown then
+											-- Skip toggle key and backspace
+											if keyCode ~= finityData.ToggleKey and keyCode ~= Enum.KeyCode.Backspace then
+												-- Set the keybind
+												keybindKey = keyCode
+												cheat.value = keybindKey
+												waitingForInput = false
+												updateButtonText()
+												setupKeybindListener()
+												
+												if callback then
+													local s, e = pcall(function()
+														callback(keybindKey)
+													end)
+													if not s then warn("error: ".. e) end
 												end
+												
+												lastKeyPressTime = currentTime
+												
+												-- Clean up
+												if keyCheckConnection then
+													keyCheckConnection:Disconnect()
+													keyCheckConnection = nil
+												end
+												return
+											elseif keyCode == Enum.KeyCode.Backspace then
+												-- Clear keybind
+												keybindKey = nil
+												cheat.value = nil
+												waitingForInput = false
+												updateButtonText()
+												
+												if keybindConnection then
+													if typeof(keybindConnection) == "RBXScriptConnection" then
+														keybindConnection:Disconnect()
+													elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindKey then
+														finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
+													end
+													keybindConnection = nil
+												end
+												
+												lastKeyPressTime = currentTime
+												
+												-- Clean up
+												if keyCheckConnection then
+													keyCheckConnection:Disconnect()
+													keyCheckConnection = nil
+												end
+												return
 											end
 										end
 									end
