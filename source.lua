@@ -935,7 +935,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								if keybindConnection then
 									if typeof(keybindConnection) == "RBXScriptConnection" then
 										keybindConnection:Disconnect()
-									elseif finity.gs["ContextActionService"] and keybindData.key then
+									elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindData.key then
 										finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
 									end
 									keybindConnection = nil
@@ -989,8 +989,20 @@ function finity.new(isdark, gprojectName, thinProject)
 								if keybindConnection then
 									if typeof(keybindConnection) == "RBXScriptConnection" then
 										keybindConnection:Disconnect()
-									elseif finity.gs["ContextActionService"] and keybindData.key then
-										finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
+									elseif keybindConnection == true and finity.gs["ContextActionService"] then
+										-- Try to unbind with the old key if it exists
+										local oldKey = keybindData.key
+										if not oldKey then
+											-- If key was cleared, we need to track it differently
+											-- Just unbind all Finity keybinds for this cheat
+											pcall(function()
+												for _, key in pairs({Enum.KeyCode.F, Enum.KeyCode.C, Enum.KeyCode.V, Enum.KeyCode.B}) do
+													finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(key))
+												end
+											end)
+										else
+											finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(oldKey))
+										end
 									end
 									keybindConnection = nil
 								end
