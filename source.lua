@@ -852,9 +852,9 @@ function finity.new(isdark, gprojectName, thinProject)
 									keybindConnection = nil
 								end
 								
-								if keybindData.key then
+								if keybindData.key and not waitingForInput then
 									keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
-										if not Process and Input.KeyCode == keybindData.key then
+										if not Process and Input.KeyCode == keybindData.key and not waitingForInput then
 											toggleCheckbox()
 										end
 									end)
@@ -886,6 +886,12 @@ function finity.new(isdark, gprojectName, thinProject)
 								if waitingForInput then return end
 								
 								finity.gs["TweenService"]:Create(cheat.keybindBtn, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
+								
+								-- Disable keybind listener while waiting for input
+								if keybindConnection then
+									keybindConnection:Disconnect()
+									keybindConnection = nil
+								end
 								
 								-- Start waiting for keybind
 								waitingForInput = true
