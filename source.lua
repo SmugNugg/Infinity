@@ -770,6 +770,98 @@ function finity.new(isdark, gprojectName, thinProject)
 							end
 						end
 
+						-- Toggle function that can be called by keybind
+						local function toggleCheckbox()
+							cheat.value = not cheat.value
+
+							if callback then
+								local s, e = pcall(function()
+									callback(cheat.value)
+								end)
+
+								if not s then warn("error: ".. e) end
+							end
+
+							if cheat.value then
+								finity.gs["TweenService"]:Create(cheat.outerbox, TweenInfo.new(0.2), {ImageColor3 = theme.checkbox_checked}):Play()
+								finity.gs["TweenService"]:Create(cheat.checkboxbutton, TweenInfo.new(0.2), {ImageColor3 = theme.checkbox_checked}):Play()
+							else
+								finity.gs["TweenService"]:Create(cheat.outerbox, TweenInfo.new(0.2), {ImageColor3 = theme.checkbox_outer}):Play()
+								finity.gs["TweenService"]:Create(cheat.checkboxbutton, TweenInfo.new(0.2), {ImageColor3 = theme.checkbox_inner}):Play()
+							end
+						end
+
+						-- Check if keybind is provided
+						local keybindKey = data and data.keybind or nil
+						local keybindConnection = nil
+						
+						-- Adjust container size if keybind exists
+						if keybindKey then
+							cheat.container.Size = UDim2.new(0, 180, 0, 22)
+						end
+
+						-- Create keybind button if keybind is provided
+						if keybindKey then
+							cheat.keybindBtn = finity:Create("ImageLabel", {
+								Name = "KeybindButton",
+								AnchorPoint = Vector2.new(1, 0.5),
+								BackgroundColor3 = Color3.new(1, 1, 1),
+								BackgroundTransparency = 1,
+								Position = UDim2.new(1, -30, 0.5, 0),
+								Size = UDim2.new(0, 25, 0, 20),
+								ZIndex = 2,
+								Image = "rbxassetid://3570695787",
+								ImageColor3 = theme.button_background,
+								ImageTransparency = 0.5,
+								ScaleType = Enum.ScaleType.Slice,
+								SliceCenter = Rect.new(100, 100, 100, 100),
+								SliceScale = 0.02
+							})
+
+							cheat.keybindText = finity:Create("TextLabel", {
+								Name = "KeybindText",
+								BackgroundColor3 = Color3.new(1, 1, 1),
+								BackgroundTransparency = 1,
+								Size = UDim2.new(1, 0, 1, 0),
+								ZIndex = 2,
+								Font = Enum.Font.Gotham,
+								Text = tostring(keybindKey.Name),
+								TextColor3 = theme.textbox_text,
+								TextSize = 11,
+								TextXAlignment = Enum.TextXAlignment.Center
+							})
+
+							cheat.keybindText.Parent = cheat.keybindBtn
+							cheat.keybindBtn.Parent = cheat.container
+
+							-- Setup keybind listener
+							local function setupKeybindListener()
+								if keybindConnection then
+									keybindConnection:Disconnect()
+									keybindConnection = nil
+								end
+								
+								if keybindKey then
+									keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+										if not Process and Input.KeyCode == keybindKey then
+											toggleCheckbox()
+										end
+									end)
+								end
+							end
+
+							setupKeybindListener()
+
+							-- Method to change keybind
+							function cheat:SetKeybind(key)
+								keybindKey = key
+								if cheat.keybindText then
+									cheat.keybindText.Text = key and tostring(key.Name) or "None"
+								end
+								setupKeybindListener()
+							end
+						end
+
 						cheat.checkbox = finity:Create("Frame", {
 							Name = "Checkbox",
 							AnchorPoint = Vector2.new(1, 0),
@@ -836,22 +928,7 @@ function finity.new(isdark, gprojectName, thinProject)
 							end
 						end)
 						cheat.checkboxbutton.MouseButton1Up:Connect(function()
-							cheat.value = not cheat.value
-
-							if callback then
-								local s, e = pcall(function()
-									callback(cheat.value)
-								end)
-
-								if not s then warn("error: ".. e) end
-							end
-
-							if cheat.value then
-								finity.gs["TweenService"]:Create(cheat.outerbox, TweenInfo.new(0.2), {ImageColor3 = theme.checkbox_checked}):Play()
-							else
-								finity.gs["TweenService"]:Create(cheat.outerbox, TweenInfo.new(0.2), {ImageColor3 = theme.checkbox_outer}):Play()
-								finity.gs["TweenService"]:Create(cheat.checkboxbutton, TweenInfo.new(0.2), {ImageColor3 = theme.checkbox_inner}):Play()
-							end
+							toggleCheckbox()
 						end)
 
 						cheat.checkboxbutton.Parent = cheat.outerbox

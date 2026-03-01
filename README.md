@@ -39,13 +39,23 @@ local movementSector = mainCategory:Sector("Movement")
 local toggle = sector:Cheat("checkbox", "Enable ESP", function(value)
     print("ESP:", value)
 end, {
-    enabled = false  -- Optional: default state
+    enabled = false,  -- Optional: default state
+    keybind = Enum.KeyCode.F  -- Optional: toggle keybind (appears to the left of checkbox)
 })
 
 -- Get/set value
 local currentValue = toggle.value
 toggle:SetValue(true)
+
+-- Change keybind programmatically
+toggle:SetKeybind(Enum.KeyCode.G)
 ```
+
+**Toggle Keybind Feature:**
+- Add `keybind` to the data table to enable a toggle keybind
+- The keybind button appears to the left of the checkbox
+- Pressing the bound key will toggle the checkbox on/off
+- The keybind automatically triggers the callback when toggled
 
 ### Button
 

@@ -64,10 +64,12 @@ end, {
 -- VISUALS - PLAYER ESP
 -- ============================================
 
--- Player ESP Enabled
+-- Player ESP Enabled (with toggle keybind - F key)
 local playerESPEnabled = VisualsPlayerESP:Cheat("checkbox", "Player ESP Enabled", function(State)
     print("Player ESP state changed:", State)
-end)
+end, {
+    keybind = Enum.KeyCode.F  -- Press F to toggle Player ESP
+})
 
 -- Player Whitelist Textbox
 local playerWhitelist = VisualsPlayerESP:Cheat("textbox", "Player To Whitelist", function(Value)
@@ -120,11 +122,12 @@ end, {
 -- AIMBOT - CONFIGURATIONS
 -- ============================================
 
--- Aimbot Enabled
+-- Aimbot Enabled (with toggle keybind - X key)
 local aimbotEnabled = AimbotConfigurations:Cheat("checkbox", "Aimbot Enabled", function(State)
     print("Aimbot state changed:", State)
     FinityWindow.config:Set("aimbotEnabled", State)
 end, {
+    keybind = Enum.KeyCode.X,  -- Press X to toggle Aimbot
     enabled = FinityWindow.config:Get("aimbotEnabled", false)
 })
 
