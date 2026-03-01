@@ -823,7 +823,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								BackgroundColor3 = Color3.new(1, 1, 1),
 								BackgroundTransparency = 1,
 								Size = UDim2.new(1, 0, 1, 0),
-								ZIndex = 2,
+								ZIndex = 3,
 								Font = Enum.Font.Gotham,
 								Text = tostring(keybindKey.Name),
 								TextColor3 = theme.textbox_text,
