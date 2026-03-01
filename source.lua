@@ -792,16 +792,16 @@ function finity.new(isdark, gprojectName, thinProject)
 						end
 
 						-- Check if keybind is provided
-						local keybindKey = data and data.keybind or nil
+						local keybindData = {key = data and data.keybind or nil}
 						local keybindConnection = nil
 						
 						-- Adjust container size if keybind exists
-						if keybindKey then
+						if keybindData.key then
 							cheat.container.Size = UDim2.new(0, 180, 0, 22)
 						end
 
 						-- Create interactive keybind button if keybind is provided
-						if keybindKey then
+						if keybindData.key then
 							local waitingForInput = false
 							
 							cheat.keybindBtn = finity:Create("ImageLabel", {
@@ -823,8 +823,8 @@ function finity.new(isdark, gprojectName, thinProject)
 							local function updateKeybindText()
 								if waitingForInput then
 									cheat.keybindText.Text = "..."
-								elseif keybindKey then
-									cheat.keybindText.Text = tostring(keybindKey.Name)
+								elseif keybindData.key then
+									cheat.keybindText.Text = tostring(keybindData.key.Name)
 								else
 									cheat.keybindText.Text = "None"
 								end
@@ -837,7 +837,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								Size = UDim2.new(1, 0, 1, 0),
 								ZIndex = 3,
 								Font = Enum.Font.Gotham,
-								Text = tostring(keybindKey.Name),
+								Text = tostring(keybindData.key.Name),
 								TextColor3 = theme.textbox_text,
 								TextSize = 11,
 								TextXAlignment = Enum.TextXAlignment.Center
@@ -852,9 +852,9 @@ function finity.new(isdark, gprojectName, thinProject)
 									keybindConnection = nil
 								end
 								
-								if keybindKey then
+								if keybindData.key then
 									keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
-										if not Process and Input.KeyCode == keybindKey then
+										if not Process and Input.KeyCode == keybindData.key then
 											toggleCheckbox()
 										end
 									end)
@@ -908,7 +908,7 @@ function finity.new(isdark, gprojectName, thinProject)
 									
 									if Input.UserInputType == Enum.UserInputType.Keyboard then
 										if Input.KeyCode ~= finityData.ToggleKey and Input.KeyCode ~= Enum.KeyCode.Backspace then
-											keybindKey = Input.KeyCode
+											keybindData.key = Input.KeyCode
 											waitingForInput = false
 											updateKeybindText()
 											setupKeybindListener()
@@ -916,7 +916,7 @@ function finity.new(isdark, gprojectName, thinProject)
 											inputConnection:Disconnect()
 											inputConnection = nil
 										elseif Input.KeyCode == Enum.KeyCode.Backspace then
-											keybindKey = nil
+											keybindData.key = nil
 											waitingForInput = false
 											updateKeybindText()
 											
@@ -936,7 +936,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								if waitingForInput then return end
 								
 								-- Right click to clear
-								keybindKey = nil
+								keybindData.key = nil
 								updateKeybindText()
 								
 								if keybindConnection then
@@ -951,7 +951,7 @@ function finity.new(isdark, gprojectName, thinProject)
 
 							-- Method to change keybind programmatically
 							function cheat:SetKeybind(key)
-								keybindKey = key
+								keybindData.key = key
 								updateKeybindText()
 								setupKeybindListener()
 							end
