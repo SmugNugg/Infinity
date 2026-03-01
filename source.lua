@@ -848,7 +848,11 @@ function finity.new(isdark, gprojectName, thinProject)
 							-- Setup keybind listener for toggling checkbox
 							local function setupKeybindListener()
 								if keybindConnection then
-									keybindConnection:Disconnect()
+									if typeof(keybindConnection) == "RBXScriptConnection" then
+										keybindConnection:Disconnect()
+									elseif finity.gs["ContextActionService"] then
+										finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
+									end
 									keybindConnection = nil
 								end
 								
@@ -856,35 +860,55 @@ function finity.new(isdark, gprojectName, thinProject)
 									local lastPressed = false
 									local lastPressedTime = 0
 									
-									-- Use RunService with IsKeyDown - this works even if game processes the key
-									keybindConnection = finity.gs["RunService"].Heartbeat:Connect(function()
-										if waitingForInput then 
-											lastPressed = false
-											return 
-										end
-										
-										-- Check if chat is open
-										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-										if chatBox then 
-											lastPressed = false
-											return 
-										end
-										
-										-- Check if key is pressed using IsKeyDown (works even for game-processed keys)
-										local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindData.key)
-										local currentTime = tick()
-										
-										if isPressed and not lastPressed then
-											-- Key was just pressed - add debounce to prevent double-trigger
-											if currentTime - lastPressedTime > 0.1 then
-												lastPressed = true
-												lastPressedTime = currentTime
-												toggleCheckbox()
+									-- Use ContextActionService to override game keybinds
+									if finity.gs["ContextActionService"] then
+										local actionName = "FinityKeybind_" .. tostring(keybindData.key)
+										finity.gs["ContextActionService"]:BindAction(actionName, function(actionName, inputState, inputObject)
+											if waitingForInput then return Enum.ContextActionResult.Pass end
+											
+											-- Check if chat is open
+											local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
+											if chatBox then return Enum.ContextActionResult.Pass end
+											
+											if inputState == Enum.UserInputState.Begin then
+												local currentTime = tick()
+												if currentTime - lastPressedTime > 0.1 then
+													lastPressedTime = currentTime
+													toggleCheckbox()
+													return Enum.ContextActionResult.Sink
+												end
 											end
-										elseif not isPressed then
-											lastPressed = false
-										end
-									end)
+											return Enum.ContextActionResult.Pass
+										end, false, true, keybindData.key)
+										keybindConnection = true -- Mark as connected
+									else
+										-- Fallback to RunService if ContextActionService not available
+										keybindConnection = finity.gs["RunService"].Heartbeat:Connect(function()
+											if waitingForInput then 
+												lastPressed = false
+												return 
+											end
+											
+											local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
+											if chatBox then 
+												lastPressed = false
+												return 
+											end
+											
+											local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindData.key)
+											local currentTime = tick()
+											
+											if isPressed and not lastPressed then
+												if currentTime - lastPressedTime > 0.1 then
+													lastPressed = true
+													lastPressedTime = currentTime
+													toggleCheckbox()
+												end
+											elseif not isPressed then
+												lastPressed = false
+											end
+										end)
+									end
 								end
 							end
 
@@ -2276,43 +2300,70 @@ function finity.new(isdark, gprojectName, thinProject)
 						
 						local function setupKeybindListener()
 							if keybindConnection then
-								keybindConnection:Disconnect()
+								if typeof(keybindConnection) == "RBXScriptConnection" then
+									keybindConnection:Disconnect()
+								elseif finity.gs["ContextActionService"] then
+									finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
+								end
 								keybindConnection = nil
 							end
 							
 							if keybindKey then
-								local lastPressed = false
 								local lastPressedTime = 0
 								
-								-- Use RunService Heartbeat with IsKeyDown - works even if game processes the key
-								keybindConnection = finity.gs["RunService"].Heartbeat:Connect(function()
-									-- Check if chat is open
-									local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-									if chatBox then 
-										lastPressed = false
-										return 
-									end
-									
-									-- Check if key is pressed using IsKeyDown (works even for game-processed keys)
-									local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindKey)
-									local currentTime = tick()
-									
-									if isPressed and not lastPressed then
-										-- Key was just pressed - add debounce to prevent double-trigger
-										if currentTime - lastPressedTime > 0.1 then
-											lastPressed = true
-											lastPressedTime = currentTime
-											if callback then
-												local s, e = pcall(function()
-													callback(keybindKey)
-												end)
-												if not s then warn("error: ".. e) end
+								-- Use ContextActionService to override game keybinds
+								if finity.gs["ContextActionService"] then
+									local actionName = "FinityKeybindBtn_" .. tostring(keybindKey)
+									finity.gs["ContextActionService"]:BindAction(actionName, function(actionName, inputState, inputObject)
+										-- Check if chat is open
+										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
+										if chatBox then return Enum.ContextActionResult.Pass end
+										
+										if inputState == Enum.UserInputState.Begin then
+											local currentTime = tick()
+											if currentTime - lastPressedTime > 0.1 then
+												lastPressedTime = currentTime
+												if callback then
+													local s, e = pcall(function()
+														callback(keybindKey)
+													end)
+													if not s then warn("error: ".. e) end
+												end
+												return Enum.ContextActionResult.Sink
 											end
 										end
-									elseif not isPressed then
-										lastPressed = false
-									end
-								end)
+										return Enum.ContextActionResult.Pass
+									end, false, true, keybindKey)
+									keybindConnection = true -- Mark as connected
+								else
+									-- Fallback to RunService if ContextActionService not available
+									local lastPressed = false
+									keybindConnection = finity.gs["RunService"].Heartbeat:Connect(function()
+										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
+										if chatBox then 
+											lastPressed = false
+											return 
+										end
+										
+										local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindKey)
+										local currentTime = tick()
+										
+										if isPressed and not lastPressed then
+											if currentTime - lastPressedTime > 0.1 then
+												lastPressed = true
+												lastPressedTime = currentTime
+												if callback then
+													local s, e = pcall(function()
+														callback(keybindKey)
+													end)
+													if not s then warn("error: ".. e) end
+												end
+											end
+										elseif not isPressed then
+											lastPressed = false
+										end
+									end)
+								end
 							end
 						end
 						
