@@ -800,8 +800,10 @@ function finity.new(isdark, gprojectName, thinProject)
 							cheat.container.Size = UDim2.new(0, 180, 0, 22)
 						end
 
-						-- Create keybind button if keybind is provided
+						-- Create interactive keybind button if keybind is provided
 						if keybindKey then
+							local waitingForInput = false
+							
 							cheat.keybindBtn = finity:Create("ImageLabel", {
 								Name = "KeybindButton",
 								AnchorPoint = Vector2.new(1, 0.5),
@@ -818,6 +820,16 @@ function finity.new(isdark, gprojectName, thinProject)
 								SliceScale = 0.02
 							})
 
+							local function updateKeybindText()
+								if waitingForInput then
+									cheat.keybindText.Text = "..."
+								elseif keybindKey then
+									cheat.keybindText.Text = tostring(keybindKey.Name)
+								else
+									cheat.keybindText.Text = "None"
+								end
+							end
+
 							cheat.keybindText = finity:Create("TextLabel", {
 								Name = "KeybindText",
 								BackgroundColor3 = Color3.new(1, 1, 1),
@@ -831,10 +843,9 @@ function finity.new(isdark, gprojectName, thinProject)
 								TextXAlignment = Enum.TextXAlignment.Center
 							})
 
-							cheat.keybindText.Parent = cheat.keybindBtn
-							cheat.keybindBtn.Parent = cheat.container
+							updateKeybindText()
 
-							-- Setup keybind listener
+							-- Setup keybind listener for toggling checkbox
 							local function setupKeybindListener()
 								if keybindConnection then
 									keybindConnection:Disconnect()
@@ -852,12 +863,96 @@ function finity.new(isdark, gprojectName, thinProject)
 
 							setupKeybindListener()
 
-							-- Method to change keybind
+							-- Make keybind button interactive
+							local keybindButton = finity:Create("TextButton", {
+								Name = "KeybindButtonInteractive",
+								BackgroundColor3 = Color3.new(1, 1, 1),
+								BackgroundTransparency = 1,
+								Size = UDim2.new(1, 0, 1, 0),
+								ZIndex = 4,
+								Font = Enum.Font.Gotham,
+								Text = "",
+								TextTransparency = 1
+							})
+
+							keybindButton.MouseEnter:Connect(function()
+								if not waitingForInput then
+									finity.gs["TweenService"]:Create(cheat.keybindBtn, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_hover}):Play()
+								end
+							end)
+
+							keybindButton.MouseLeave:Connect(function()
+								if not waitingForInput then
+									finity.gs["TweenService"]:Create(cheat.keybindBtn, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
+								end
+							end)
+
+							keybindButton.MouseButton1Down:Connect(function()
+								if not waitingForInput then
+									finity.gs["TweenService"]:Create(cheat.keybindBtn, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_down}):Play()
+								end
+							end)
+
+							keybindButton.MouseButton1Up:Connect(function()
+								if waitingForInput then return end
+								
+								finity.gs["TweenService"]:Create(cheat.keybindBtn, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
+								
+								-- Start waiting for keybind
+								waitingForInput = true
+								updateKeybindText()
+								
+								local inputConnection
+								inputConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+									if Process then return end
+									
+									if Input.UserInputType == Enum.UserInputType.Keyboard then
+										if Input.KeyCode ~= finityData.ToggleKey and Input.KeyCode ~= Enum.KeyCode.Backspace then
+											keybindKey = Input.KeyCode
+											waitingForInput = false
+											updateKeybindText()
+											setupKeybindListener()
+											
+											inputConnection:Disconnect()
+											inputConnection = nil
+										elseif Input.KeyCode == Enum.KeyCode.Backspace then
+											keybindKey = nil
+											waitingForInput = false
+											updateKeybindText()
+											
+											if keybindConnection then
+												keybindConnection:Disconnect()
+												keybindConnection = nil
+											end
+											
+											inputConnection:Disconnect()
+											inputConnection = nil
+										end
+									end
+								end)
+							end)
+
+							keybindButton.MouseButton2Up:Connect(function()
+								if waitingForInput then return end
+								
+								-- Right click to clear
+								keybindKey = nil
+								updateKeybindText()
+								
+								if keybindConnection then
+									keybindConnection:Disconnect()
+									keybindConnection = nil
+								end
+							end)
+
+							cheat.keybindText.Parent = cheat.keybindBtn
+							keybindButton.Parent = cheat.keybindBtn
+							cheat.keybindBtn.Parent = cheat.container
+
+							-- Method to change keybind programmatically
 							function cheat:SetKeybind(key)
 								keybindKey = key
-								if cheat.keybindText then
-									cheat.keybindText.Text = key and tostring(key.Name) or "None"
-								end
+								updateKeybindText()
 								setupKeybindListener()
 							end
 						end
