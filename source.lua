@@ -114,25 +114,29 @@ end
 finity.keybinds = {}
 finity.keybinds.binds = {}
 finity.keybinds.connections = {}
-finity.keybinds.threadRunning = false
+finity.keybinds.threadConnection = nil
 finity.keybinds.keyStates = {} -- Track last pressed state for each key
 
 -- Separate thread that constantly checks key states using IsKeyDown
 function finity.keybinds:StartKeybindThread()
-	if self.threadRunning then return end
-	self.threadRunning = true
+	if self.threadConnection then return end
 	
-	task.spawn(function()
-		while self.threadRunning do
-			pcall(function()
-				-- Check if chat is open
-				local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-				local chatOpen = chatBox ~= nil
-				
-				-- Check all registered keybinds
-				for bindId, bindData in pairs(self.binds) do
-					if bindData.key and not chatOpen then
-						local isPressed = finity.gs["UserInputService"]:IsKeyDown(bindData.key)
+	-- Use RunService.Heartbeat for reliable checking
+	self.threadConnection = finity.gs["RunService"].Heartbeat:Connect(function()
+		pcall(function()
+			-- Check if chat is open
+			local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
+			local chatOpen = chatBox ~= nil
+			
+			-- Check all registered keybinds
+			for bindId, bindData in pairs(self.binds) do
+				if bindData and bindData.key and not chatOpen then
+					-- Use IsKeyDown to check actual key state (works even if game processes the key)
+					local success, isPressed = pcall(function()
+						return finity.gs["UserInputService"]:IsKeyDown(bindData.key)
+					end)
+					
+					if success then
 						local lastState = self.keyStates[bindId] or false
 						
 						-- Key was just pressed (edge detection)
@@ -140,23 +144,25 @@ function finity.keybinds:StartKeybindThread()
 							self.keyStates[bindId] = true
 							-- Call the callback
 							if bindData.callback then
-								local success, err = pcall(bindData.callback, bindData.key)
-								if not success then
-									warn("Keybind error (" .. bindId .. "):", err)
-								end
+								task.spawn(function()
+									local success2, err = pcall(bindData.callback, bindData.key)
+									if not success2 then
+										warn("Keybind error (" .. bindId .. "):", err)
+									end
+								end)
 							end
 						elseif not isPressed then
 							self.keyStates[bindId] = false
 						end
-					elseif chatOpen then
-						-- Reset state when chat opens
+					end
+				elseif chatOpen then
+					-- Reset state when chat opens
+					if self.keyStates[bindId] then
 						self.keyStates[bindId] = false
 					end
 				end
-			end)
-			
-			task.wait(0.01) -- Check every 10ms for responsiveness
-		end
+			end
+		end)
 	end)
 end
 
@@ -196,6 +202,12 @@ function finity.keybinds:Unregister(bindId)
 			self.connections[bindId]:Disconnect()
 		end
 		self.connections[bindId] = nil
+	end
+	
+	-- Stop thread if no more keybinds
+	if self.threadConnection and next(self.binds) == nil then
+		self.threadConnection:Disconnect()
+		self.threadConnection = nil
 	end
 end
 
