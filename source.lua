@@ -110,12 +110,25 @@ function finity.config:Set(key, value)
 	self:Save()
 end
 
--- Global Keybind Manager using ContextActionService (works with ALL keys, even game-processed)
+-- Global Keybind Manager using polling (works with ALL keys, doesn't block game input)
 finity.keybinds = {}
 finity.keybinds.binds = {}
 finity.keybinds.connections = {}
 finity.keybinds.keyStates = {} -- Track last pressed state for each key
 finity.keybinds.lastTriggerTime = {} -- Track last trigger time for debouncing
+
+-- Common keys array (reused for performance)
+finity.keybinds.commonKeys = {
+	Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T, Enum.KeyCode.Y,
+	Enum.KeyCode.U, Enum.KeyCode.I, Enum.KeyCode.O, Enum.KeyCode.P, Enum.KeyCode.A, Enum.KeyCode.S,
+	Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.G, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K,
+	Enum.KeyCode.L, Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V, Enum.KeyCode.B,
+	Enum.KeyCode.N, Enum.KeyCode.M, Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three,
+	Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight,
+	Enum.KeyCode.Nine, Enum.KeyCode.Zero, Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift,
+	Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl, Enum.KeyCode.LeftAlt, Enum.KeyCode.RightAlt,
+	Enum.KeyCode.Space, Enum.KeyCode.Backspace
+}
 
 -- Register a keybind using polling (doesn't block game input)
 function finity.keybinds:Register(key, callback, name)
@@ -131,15 +144,6 @@ function finity.keybinds:Register(key, callback, name)
 		self:Unregister(bindId)
 	end
 	
-	-- Check if chat is open
-	local function isChatOpen()
-		local UIS = finity.gs["UserInputService"]
-		if UIS then
-			return UIS:GetFocusedTextBox() ~= nil
-		end
-		return false
-	end
-	
 	-- Use polling with IsKeyDown (doesn't interfere with game input)
 	local UIS = finity.gs["UserInputService"]
 	local RunService = finity.gs["RunService"]
@@ -147,6 +151,8 @@ function finity.keybinds:Register(key, callback, name)
 	if UIS and RunService then
 		local wasDown = false
 		local checkInterval = 0
+		local cachedChatState = false
+		local chatCheckInterval = 0
 		
 		-- Create a connection that polls for key state
 		local connection = RunService.Heartbeat:Connect(function()
@@ -157,8 +163,15 @@ function finity.keybinds:Register(key, callback, name)
 			end
 			checkInterval = 0
 			
+			-- Cache chat state check (only check every 10 frames for performance)
+			chatCheckInterval = chatCheckInterval + 1
+			if chatCheckInterval >= 10 then
+				chatCheckInterval = 0
+				cachedChatState = UIS:GetFocusedTextBox() ~= nil
+			end
+			
 			-- Skip if chat is open
-			if isChatOpen() then
+			if cachedChatState then
 				wasDown = false
 				return
 			end
@@ -1088,19 +1101,7 @@ function finity.new(isdark, gprojectName, thinProject)
 									end
 									
 									-- Only check common keys instead of all keys for better performance
-									local commonKeys = {
-										Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T, Enum.KeyCode.Y,
-										Enum.KeyCode.U, Enum.KeyCode.I, Enum.KeyCode.O, Enum.KeyCode.P, Enum.KeyCode.A, Enum.KeyCode.S,
-										Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.G, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K,
-										Enum.KeyCode.L, Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V, Enum.KeyCode.B,
-										Enum.KeyCode.N, Enum.KeyCode.M, Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three,
-										Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight,
-										Enum.KeyCode.Nine, Enum.KeyCode.Zero, Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift,
-										Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl, Enum.KeyCode.LeftAlt, Enum.KeyCode.RightAlt,
-										Enum.KeyCode.Space, Enum.KeyCode.Backspace
-									}
-									
-									for _, keyCode in ipairs(commonKeys) do
+									for _, keyCode in ipairs(finity.keybinds.commonKeys) do
 										local success, isDown = pcall(function()
 											return UIS:IsKeyDown(keyCode)
 										end)
@@ -2561,19 +2562,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								end
 								
 								-- Only check common keys instead of all keys for better performance
-								local commonKeys = {
-									Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T, Enum.KeyCode.Y,
-									Enum.KeyCode.U, Enum.KeyCode.I, Enum.KeyCode.O, Enum.KeyCode.P, Enum.KeyCode.A, Enum.KeyCode.S,
-									Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.G, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K,
-									Enum.KeyCode.L, Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V, Enum.KeyCode.B,
-									Enum.KeyCode.N, Enum.KeyCode.M, Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three,
-									Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight,
-									Enum.KeyCode.Nine, Enum.KeyCode.Zero, Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift,
-									Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl, Enum.KeyCode.LeftAlt, Enum.KeyCode.RightAlt,
-									Enum.KeyCode.Space, Enum.KeyCode.Backspace
-								}
-								
-								for _, keyCode in ipairs(commonKeys) do
+								for _, keyCode in ipairs(finity.keybinds.commonKeys) do
 									local success, isDown = pcall(function()
 										return UIS:IsKeyDown(keyCode)
 									end)
