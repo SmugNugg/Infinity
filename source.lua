@@ -167,9 +167,12 @@ function finity.keybinds:StartKeybindThread()
 end
 
 function finity.keybinds:Register(key, callback, name)
-	if not key or not callback then return end
+	if not key or not callback then 
+		warn("Finity Keybind: Invalid key or callback")
+		return 
+	end
 	
-	local bindId = name or tostring(key)
+	local bindId = name or ("FinityKeybind_" .. tostring(key) .. "_" .. tostring(tick()))
 	
 	-- Remove existing bind if present
 	if self.binds[bindId] then
@@ -181,6 +184,9 @@ function finity.keybinds:Register(key, callback, name)
 		callback = callback,
 		name = bindId
 	}
+	
+	-- Initialize key state
+	self.keyStates[bindId] = false
 	
 	-- Start the thread if not already running
 	self:StartKeybindThread()
@@ -212,8 +218,12 @@ function finity.keybinds:Unregister(bindId)
 end
 
 function finity.keybinds:Clear()
-	for bindId, _ in pairs(self.connections) do
+	for bindId, _ in pairs(self.binds) do
 		self:Unregister(bindId)
+	end
+	if self.threadConnection then
+		self.threadConnection:Disconnect()
+		self.threadConnection = nil
 	end
 end
 
