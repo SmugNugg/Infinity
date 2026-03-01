@@ -3,7 +3,7 @@
 local Finity = loadstring(game:HttpGet("https://raw.githubusercontent.com/SmugNugg/Infinity/refs/heads/main/source.lua", true))();
 
 -- Create window (false = light theme, true = dark theme)
-local FinityWindow = Finity.new(false, "Example Script")
+local FinityWindow = Finity.new(true, "Example Script")
 
 -- Change toggle key (default is Home)
 FinityWindow:ChangeToggleKey(Enum.KeyCode.Semicolon)
@@ -177,25 +177,27 @@ end, {
 -- AIMBOT - HOTKEYS
 -- ============================================
 
--- Quick Toggle Hotkey Textbox
-local quickToggleHotkey = AimbotHotkeys:Cheat("textbox", "Quick Toggle Hotkey", function(Value)
-    print("Quick toggle hotkey changed:", Value)
+-- Quick Toggle Hotkey (Interactive Keybind - Click to Rebind)
+local quickToggleHotkey = AimbotHotkeys:Cheat("keybind", "Quick Toggle Hotkey", function(key)
+    print("Quick toggle hotkey pressed:", key)
+    -- This fires when the key is pressed
 end, {
-    placeholder = "KeyCode"
+    bind = Enum.KeyCode.Q  -- Optional: default keybind
 })
 
--- Panic Hotkey Textbox
-local panicHotkey = AimbotHotkeys:Cheat("textbox", "Panic Hotkey", function(Value)
-    print("Panic hotkey changed:", Value)
+-- Panic Hotkey (Interactive Keybind - Click to Rebind)
+local panicHotkey = AimbotHotkeys:Cheat("keybind", "Panic Hotkey", function(key)
+    print("Panic hotkey pressed:", key)
+    -- This fires when the key is pressed
 end, {
-    placeholder = "KeyCode"
+    bind = Enum.KeyCode.P  -- Optional: default keybind
 })
 
 -- Reset Key Button
 AimbotHotkeys:Cheat("button", "Reset Key", function()
     print("Key reset!")
-    quickToggleHotkey:SetValue("")
-    panicHotkey:SetValue("")
+    quickToggleHotkey:SetValue(nil)  -- Clear keybind
+    panicHotkey:SetValue(nil)  -- Clear keybind
 end)
 
 -- Keybind Button Example (displays key and triggers on press)

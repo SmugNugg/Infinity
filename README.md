@@ -127,23 +127,40 @@ end, {
 multiDropdown:SetValue({"Item 1", "Item 3"})
 ```
 
-### Keybind (Input Binding)
+### Keybind (Interactive - Click to Rebind)
+
+**This is the recommended way to handle keybinds!** Allows users to click and rebind keys.
 
 ```lua
 local keybind = sector:Cheat("keybind", "Toggle Menu", function(key)
     print("Key pressed:", key)
+    -- This callback fires when the bound key is pressed
 end, {
     bind = Enum.KeyCode.F  -- Optional: default keybind
 })
 
 -- Set keybind programmatically
 keybind:SetValue(Enum.KeyCode.G)
+
+-- Usage:
+-- - Left click the keybind button to rebind
+-- - Press any key to set it (or Backspace to clear)
+-- - Right click to clear the keybind
+-- - The callback fires automatically when the key is pressed
 ```
 
-### Keybind Button (Display & Trigger)
+**Features:**
+- Click to rebind - User-friendly rebinding interface
+- Shows current keybind - Displays "Bound to [KeyName]"
+- Auto-triggers - Callback fires when key is pressed
+- Can be cleared - Right click or press Backspace
+
+### Keybind Button (Display & Trigger - Non-Rebindable)
+
+Displays a keybind as a button that triggers on press, but doesn't allow rebinding.
 
 ```lua
-local keybindBtn = sector:Cheat("keybindbutton", "Teleport", function(key)
+local keybindBtn = sector:Cheat("keybindbutton", "Teleport", function()
     print("Teleporting...")
 end, {
     key = Enum.KeyCode.T,
@@ -151,8 +168,14 @@ end, {
 })
 
 -- Methods
-keybindBtn:SetKey(Enum.KeyCode.R)
-keybindBtn:SetText("Quick Teleport")
+keybindBtn:SetKey(Enum.KeyCode.R)  -- Change the key
+keybindBtn:SetText("Quick Teleport")  -- Change the button text
+
+-- Usage:
+-- - Displays as: "Teleport [T]"
+-- - Clicking the button triggers the callback
+-- - Pressing T also triggers the callback automatically
+-- - Cannot be rebound by user (use "keybind" for that)
 ```
 
 ### Color Picker
