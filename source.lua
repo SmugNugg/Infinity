@@ -853,24 +853,25 @@ function finity.new(isdark, gprojectName, thinProject)
 								end
 								
 								if keybindData.key and not waitingForInput then
-									-- Use a separate connection that fires before Process is set
-									keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
-										-- Don't check Process - allow all key presses to work
-										-- This allows F, C, V and other game-processed keys to work
+									local lastPressed = false
+									
+									-- Use both InputBegan and RunService for maximum compatibility
+									keybindConnection = finity.gs["RunService"].RenderStepped:Connect(function()
+										if waitingForInput then return end
 										
-										-- Check if chat is open (don't trigger if typing in chat)
+										-- Check if chat is open
 										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
 										if chatBox then return end
 										
-										-- Skip if it's the toggle key (to prevent menu toggle conflicts)
-										if Input.KeyCode == finityData.ToggleKey then return end
+										-- Check if key is pressed
+										local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindData.key)
 										
-										-- Check if waiting for input
-										if waitingForInput then return end
-										
-										-- Trigger the toggle
-										if Input.KeyCode == keybindData.key then
+										if isPressed and not lastPressed then
+											-- Key was just pressed
+											lastPressed = true
 											toggleCheckbox()
+										elseif not isPressed then
+											lastPressed = false
 										end
 									end)
 								end
@@ -2269,25 +2270,31 @@ function finity.new(isdark, gprojectName, thinProject)
 							end
 							
 							if keybindKey then
-								keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
-									-- Don't check Process - allow all key presses to work
-									-- This allows F, C, V and other game-processed keys to work
-									
-									-- Check if chat is open (don't trigger if typing in chat)
+								local lastPressed = false
+								
+								-- Use RunService for maximum compatibility with game-processed keys
+								keybindConnection = finity.gs["RunService"].RenderStepped:Connect(function()
+									-- Check if chat is open
 									local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-									if chatBox then return end
+									if chatBox then 
+										lastPressed = false
+										return 
+									end
 									
-									-- Skip if it's the toggle key (to prevent menu toggle conflicts)
-									if Input.KeyCode == finityData.ToggleKey then return end
+									-- Check if key is pressed
+									local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindKey)
 									
-									-- Trigger the callback
-									if Input.KeyCode == keybindKey then
+									if isPressed and not lastPressed then
+										-- Key was just pressed
+										lastPressed = true
 										if callback then
 											local s, e = pcall(function()
 												callback(keybindKey)
 											end)
 											if not s then warn("error: ".. e) end
 										end
+									elseif not isPressed then
+										lastPressed = false
 									end
 								end)
 							end
