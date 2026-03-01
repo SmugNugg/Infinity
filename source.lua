@@ -110,139 +110,14 @@ function finity.config:Set(key, value)
 	self:Save()
 end
 
--- Global Keybind Manager with separate thread for game-processed keys
+-- Global Keybind Manager using ContextActionService (works with ALL keys, even game-processed)
 finity.keybinds = {}
 finity.keybinds.binds = {}
 finity.keybinds.connections = {}
-finity.keybinds.threadConnection = nil
-finity.keybinds.inputBeganConnection = nil
-finity.keybinds.inputEndedConnection = nil
 finity.keybinds.keyStates = {} -- Track last pressed state for each key
-finity.keybinds.lastCheckTime = {} -- Track last check time for debouncing
+finity.keybinds.lastTriggerTime = {} -- Track last trigger time for debouncing
 
--- Separate thread that constantly checks key states using IsKeyDown
-function finity.keybinds:StartKeybindThread()
-	if self.threadConnection then return end
-	
-	local UIS = finity.gs["UserInputService"]
-	local RunService = finity.gs["RunService"]
-	
-	-- Use RenderStepped for more frequent checking (higher priority than Heartbeat)
-	self.threadConnection = RunService.RenderStepped:Connect(function()
-		pcall(function()
-			-- Check if chat is open
-			local chatBox = UIS:GetFocusedTextBox()
-			local chatOpen = chatBox ~= nil
-			
-			-- Also check if any GUI is focused
-			local guiService = finity.gs["GuiService"]
-			local guiFocused = false
-			if guiService then
-				guiFocused = guiService:GetGuiInset().Y > 0 or guiService.SelectedObject ~= nil
-			end
-			
-			-- Skip if chat or GUI is focused
-			if chatOpen or guiFocused then
-				-- Reset all key states when chat/GUI is open
-				for bindId, _ in pairs(self.keyStates) do
-					self.keyStates[bindId] = false
-				end
-				return
-			end
-			
-			-- Check all registered keybinds
-			local currentTime = tick()
-			for bindId, bindData in pairs(self.binds) do
-				if bindData and bindData.key then
-					-- Debounce: Don't check the same key too frequently (every 0.01 seconds minimum)
-					local lastCheck = self.lastCheckTime[bindId] or 0
-					if currentTime - lastCheck >= 0.01 then
-						self.lastCheckTime[bindId] = currentTime
-						
-						-- Use IsKeyDown to check actual key state (works even if game processes the key)
-						local success, isPressed = pcall(function()
-							return UIS:IsKeyDown(bindData.key)
-						end)
-						
-						if success then
-							local lastState = self.keyStates[bindId] or false
-							
-							-- Key was just pressed (edge detection)
-							if isPressed and not lastState then
-								self.keyStates[bindId] = true
-								-- Call the callback
-								if bindData.callback then
-									task.spawn(function()
-										local success2, err = pcall(bindData.callback, bindData.key)
-										if not success2 then
-											warn("Keybind error (" .. bindId .. "):", err)
-										end
-									end)
-								end
-							elseif not isPressed then
-								self.keyStates[bindId] = false
-							end
-						end
-						-- If IsKeyDown fails, try alternative method using InputBegan as fallback
-						-- This is handled by the InputBegan connection below
-					end
-				end
-			end
-		end)
-	end)
-	
-	-- Also set up InputBegan as a fallback for keys that IsKeyDown might miss
-	-- This catches keys that are processed by the game but still fire InputBegan
-	if not self.inputBeganConnection then
-		self.inputBeganConnection = UIS.InputBegan:Connect(function(input, gameProcessed)
-			pcall(function()
-				-- Skip if game processed it (we rely on IsKeyDown for those)
-				if gameProcessed then return end
-				
-				-- Check if chat is open
-				local chatBox = UIS:GetFocusedTextBox()
-				if chatBox then return end
-				
-				-- Check if this key matches any registered keybind
-				if input.KeyCode ~= Enum.KeyCode.Unknown then
-					for bindId, bindData in pairs(self.binds) do
-						if bindData and bindData.key == input.KeyCode then
-							local lastState = self.keyStates[bindId] or false
-							-- Only trigger if not already pressed (edge detection)
-							if not lastState then
-								self.keyStates[bindId] = true
-								if bindData.callback then
-									task.spawn(function()
-										local success, err = pcall(bindData.callback, bindData.key)
-										if not success then
-											warn("Keybind error (" .. bindId .. "):", err)
-										end
-									end)
-								end
-							end
-						end
-					end
-				end
-			end)
-		end)
-	end
-	
-	-- Reset key states on InputEnded to ensure proper edge detection
-	if not self.inputEndedConnection then
-		self.inputEndedConnection = UIS.InputEnded:Connect(function(input)
-			pcall(function()
-				if input.KeyCode ~= Enum.KeyCode.Unknown then
-					for bindId, bindData in pairs(self.binds) do
-						if bindData and bindData.key == input.KeyCode then
-							self.keyStates[bindId] = false
-						end
-					end
-				end
-			end)
-		end)
-	end
-end
-
+-- Register a keybind using ContextActionService (intercepts keys even when game processes them)
 function finity.keybinds:Register(key, callback, name)
 	if not key or not callback then 
 		warn("Finity Keybind: Invalid key or callback")
@@ -256,69 +131,108 @@ function finity.keybinds:Register(key, callback, name)
 		self:Unregister(bindId)
 	end
 	
+	-- Check if chat is open
+	local function isChatOpen()
+		local UIS = finity.gs["UserInputService"]
+		if UIS then
+			return UIS:GetFocusedTextBox() ~= nil
+		end
+		return false
+	end
+	
+	-- Use ContextActionService to intercept the key at high priority
+	local CAS = finity.gs["ContextActionService"]
+	if CAS then
+		local actionName = "FinityKeybind_" .. bindId
+		
+		-- Bind action with highest priority to intercept before game processes it
+		CAS:BindActionAtPriority(
+			actionName,
+			function(actionName, inputState, inputObject)
+				-- Only trigger on press (not release)
+				if inputState == Enum.UserInputState.Begin then
+					-- Check chat
+					if isChatOpen() then
+						return Enum.ContextActionResult.Pass
+					end
+					
+					-- Debounce: prevent rapid firing (50ms minimum)
+					local currentTime = tick()
+					local lastTrigger = self.lastTriggerTime[bindId] or 0
+					if currentTime - lastTrigger < 0.05 then
+						return Enum.ContextActionResult.Sink
+					end
+					self.lastTriggerTime[bindId] = currentTime
+					
+					-- Call the callback
+					if callback then
+						task.spawn(function()
+							local success, err = pcall(callback, key)
+							if not success then
+								warn("Keybind error (" .. bindId .. "):", err)
+							end
+						end)
+					end
+					
+					-- Sink the input so game doesn't process it (optional - remove if you want game to also process)
+					return Enum.ContextActionResult.Sink
+				end
+				return Enum.ContextActionResult.Pass
+			end,
+			false,
+			Enum.ContextActionPriority.High.Value, -- High priority (2000)
+			key
+		)
+		
 	self.binds[bindId] = {
 		key = key,
 		callback = callback,
-		name = bindId
+		name = bindId,
+		actionName = actionName
 	}
 	
-	-- Initialize key state
 	self.keyStates[bindId] = false
+	self.lastTriggerTime[bindId] = 0
 	
-	-- Start the thread if not already running
-	self:StartKeybindThread()
-	
-	return bindId
+		return bindId
+	else
+		warn("Finity Keybind: ContextActionService not available")
+		return nil
+	end
 end
 
 function finity.keybinds:Unregister(bindId)
 	-- Remove from binds and keyStates
 	if self.binds[bindId] then
+		local bindData = self.binds[bindId]
+		
+		-- Unbind from ContextActionService
+		local CAS = finity.gs["ContextActionService"]
+		if CAS and bindData.actionName then
+			CAS:UnbindAction(bindData.actionName)
+		end
+		
 		self.binds[bindId] = nil
 		if self.keyStates then
 			self.keyStates[bindId] = nil
 		end
+		if self.lastTriggerTime then
+			self.lastTriggerTime[bindId] = nil
+		end
 	end
-	-- Disconnect if it's a connection
+	
+	-- Disconnect if it's a connection (legacy support)
 	if self.connections[bindId] then
 		if typeof(self.connections[bindId]) == "RBXScriptConnection" then
 			self.connections[bindId]:Disconnect()
 		end
 		self.connections[bindId] = nil
 	end
-	
-	-- Stop thread if no more keybinds
-	if self.threadConnection and next(self.binds) == nil then
-		self.threadConnection:Disconnect()
-		self.threadConnection = nil
-		
-		-- Also disconnect InputBegan/InputEnded if no more keybinds
-		if self.inputBeganConnection then
-			self.inputBeganConnection:Disconnect()
-			self.inputBeganConnection = nil
-		end
-		if self.inputEndedConnection then
-			self.inputEndedConnection:Disconnect()
-			self.inputEndedConnection = nil
-		end
-	end
 end
 
 function finity.keybinds:Clear()
 	for bindId, _ in pairs(self.binds) do
 		self:Unregister(bindId)
-	end
-	if self.threadConnection then
-		self.threadConnection:Disconnect()
-		self.threadConnection = nil
-	end
-	if self.inputBeganConnection then
-		self.inputBeganConnection:Disconnect()
-		self.inputBeganConnection = nil
-	end
-	if self.inputEndedConnection then
-		self.inputEndedConnection:Disconnect()
-		self.inputEndedConnection = nil
 	end
 end
 
