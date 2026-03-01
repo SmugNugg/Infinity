@@ -1290,6 +1290,8 @@ function finity.new(isdark, gprojectName, thinProject)
 						end
 						
 						local function refreshOptions()
+							local wasOpen = cheat.dropped
+							
 							-- Don't close dropdown when refreshing options
 							for _, child in next, cheat.list:GetChildren() do
 								if child:IsA("TextButton") then
@@ -1360,7 +1362,7 @@ function finity.new(isdark, gprojectName, thinProject)
 									end
 									
 									updateText()
-									refreshOptions()
+									refreshOptions()  -- Refresh to update visual state
 									
 									if callback then
 										local s, e = pcall(function()
@@ -1372,10 +1374,35 @@ function finity.new(isdark, gprojectName, thinProject)
 								
 								button.Parent = cheat.list
 								
-								finity.gs["TweenService"]:Create(button, TweenInfo.new(0), {BackgroundTransparency = isSelected and 0.3 or 1}):Play()
+								-- Show button if dropdown is open
+								if wasOpen then
+									finity.gs["TweenService"]:Create(button, TweenInfo.new(0), {BackgroundTransparency = isSelected and 0.3 or 1}):Play()
+								else
+									finity.gs["TweenService"]:Create(button, TweenInfo.new(0), {BackgroundTransparency = 1}):Play()
+								end
 							end
 							
-							finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0), {Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 0), CanvasSize = UDim2.new(0, 0, 0, cheat.list["UIListLayout"].AbsoluteContentSize.Y), ScrollBarImageTransparency = 1, BackgroundTransparency = 1}):Play()
+							-- Update list size and visibility based on open state
+							local listLayout = cheat.list:FindFirstChild("UIListLayout")
+							if listLayout then
+								if wasOpen then
+									finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0), {
+										Size = UDim2.new(1, 0, 0, math.clamp(listLayout.AbsoluteContentSize.Y, 0, 150)),
+										Position = UDim2.new(0, 0, 1, 0),
+										CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y),
+										ScrollBarImageTransparency = 0,
+										BackgroundTransparency = 0.2
+									}):Play()
+								else
+									finity.gs["TweenService"]:Create(cheat.list, TweenInfo.new(0), {
+										Size = UDim2.new(1, 0, 0, 0),
+										Position = UDim2.new(0, 0, 1, 0),
+										CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y),
+										ScrollBarImageTransparency = 1,
+										BackgroundTransparency = 1
+									}):Play()
+								end
+							end
 						end
 						
 						function cheat.fadelist()
@@ -1415,6 +1442,33 @@ function finity.new(isdark, gprojectName, thinProject)
 						end)
 						cheat.dropdown.MouseButton1Click:Connect(function()
 							cheat.fadelist()
+						end)
+						
+						-- Click-away detection to close dropdown
+						local clickAwayConnection
+						clickAwayConnection = finity.gs["UserInputService"].InputBegan:Connect(function(input, gameProcessed)
+							if gameProcessed then return end
+							if input.UserInputType == Enum.UserInputType.MouseButton1 and cheat.dropped then
+								task.wait()  -- Wait for click to register
+								local target = finity.gs["UserInputService"]:GetMouseLocation()
+								local gui = finity.gs["GuiService"]:GetGuiInset()
+								local mousePos = Vector2.new(target.X - gui.X, target.Y - gui.Y)
+								
+								local containerPos = cheat.container.AbsolutePosition
+								local containerSize = cheat.container.AbsoluteSize
+								local listPos = cheat.list.AbsolutePosition
+								local listSize = cheat.list.AbsoluteSize
+								
+								-- Check if click is outside the dropdown container and list
+								local inContainer = mousePos.X >= containerPos.X and mousePos.X <= containerPos.X + containerSize.X and
+								                     mousePos.Y >= containerPos.Y and mousePos.Y <= containerPos.Y + containerSize.Y
+								local inList = mousePos.X >= listPos.X and mousePos.X <= listPos.X + listSize.X and
+								               mousePos.Y >= listPos.Y and mousePos.Y <= listPos.Y + listSize.Y
+								
+								if not inContainer and not inList then
+									cheat.fadelist()
+								end
+							end
 						end)
 						
 						refreshOptions()
