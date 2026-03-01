@@ -854,22 +854,33 @@ function finity.new(isdark, gprojectName, thinProject)
 								
 								if keybindData.key and not waitingForInput then
 									local lastPressed = false
+									local lastPressedTime = 0
 									
-									-- Use both InputBegan and RunService for maximum compatibility
-									keybindConnection = finity.gs["RunService"].RenderStepped:Connect(function()
-										if waitingForInput then return end
+									-- Use RunService with IsKeyDown - this works even if game processes the key
+									keybindConnection = finity.gs["RunService"].Heartbeat:Connect(function()
+										if waitingForInput then 
+											lastPressed = false
+											return 
+										end
 										
 										-- Check if chat is open
 										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-										if chatBox then return end
+										if chatBox then 
+											lastPressed = false
+											return 
+										end
 										
-										-- Check if key is pressed
+										-- Check if key is pressed using IsKeyDown (works even for game-processed keys)
 										local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindData.key)
+										local currentTime = tick()
 										
 										if isPressed and not lastPressed then
-											-- Key was just pressed
-											lastPressed = true
-											toggleCheckbox()
+											-- Key was just pressed - add debounce to prevent double-trigger
+											if currentTime - lastPressedTime > 0.1 then
+												lastPressed = true
+												lastPressedTime = currentTime
+												toggleCheckbox()
+											end
 										elseif not isPressed then
 											lastPressed = false
 										end
@@ -2271,9 +2282,10 @@ function finity.new(isdark, gprojectName, thinProject)
 							
 							if keybindKey then
 								local lastPressed = false
+								local lastPressedTime = 0
 								
-								-- Use RunService for maximum compatibility with game-processed keys
-								keybindConnection = finity.gs["RunService"].RenderStepped:Connect(function()
+								-- Use RunService Heartbeat with IsKeyDown - works even if game processes the key
+								keybindConnection = finity.gs["RunService"].Heartbeat:Connect(function()
 									-- Check if chat is open
 									local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
 									if chatBox then 
@@ -2281,17 +2293,21 @@ function finity.new(isdark, gprojectName, thinProject)
 										return 
 									end
 									
-									-- Check if key is pressed
+									-- Check if key is pressed using IsKeyDown (works even for game-processed keys)
 									local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindKey)
+									local currentTime = tick()
 									
 									if isPressed and not lastPressed then
-										-- Key was just pressed
-										lastPressed = true
-										if callback then
-											local s, e = pcall(function()
-												callback(keybindKey)
-											end)
-											if not s then warn("error: ".. e) end
+										-- Key was just pressed - add debounce to prevent double-trigger
+										if currentTime - lastPressedTime > 0.1 then
+											lastPressed = true
+											lastPressedTime = currentTime
+											if callback then
+												local s, e = pcall(function()
+													callback(keybindKey)
+												end)
+												if not s then warn("error: ".. e) end
+											end
 										end
 									elseif not isPressed then
 										lastPressed = false
