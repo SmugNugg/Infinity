@@ -1348,6 +1348,8 @@ function finity.new(isdark, gprojectName, thinProject)
 									end
 								end)
 								button.MouseButton1Click:Connect(function()
+									-- Prevent click from bubbling to dropdown
+									
 									local found = false
 									for i, selected in next, cheat.value do
 										if selected == value then
@@ -1362,7 +1364,28 @@ function finity.new(isdark, gprojectName, thinProject)
 									end
 									
 									updateText()
-									refreshOptions()  -- Refresh to update visual state
+									
+									-- Update button visual state without closing dropdown
+									local currentSelected = not found
+									finity.gs["TweenService"]:Create(button, TweenInfo.new(0.2), {
+										BackgroundTransparency = currentSelected and 0.3 or 1
+									}):Play()
+									
+									-- Refresh all buttons to update their states
+									for _, btn in next, cheat.list:GetChildren() do
+										if btn:IsA("TextButton") and btn ~= button then
+											local btnIsSelected = false
+											for _, selected in next, cheat.value do
+												if selected == btn.Text then
+													btnIsSelected = true
+													break
+												end
+											end
+											finity.gs["TweenService"]:Create(btn, TweenInfo.new(0.2), {
+												BackgroundTransparency = btnIsSelected and 0.3 or 1
+											}):Play()
+										end
+									end
 									
 									if callback then
 										local s, e = pcall(function()
@@ -1449,25 +1472,27 @@ function finity.new(isdark, gprojectName, thinProject)
 						clickAwayConnection = finity.gs["UserInputService"].InputBegan:Connect(function(input, gameProcessed)
 							if gameProcessed then return end
 							if input.UserInputType == Enum.UserInputType.MouseButton1 and cheat.dropped then
-								task.wait()  -- Wait for click to register
-								local target = finity.gs["UserInputService"]:GetMouseLocation()
-								local gui = finity.gs["GuiService"]:GetGuiInset()
-								local mousePos = Vector2.new(target.X - gui.X, target.Y - gui.Y)
-								
-								local containerPos = cheat.container.AbsolutePosition
-								local containerSize = cheat.container.AbsoluteSize
-								local listPos = cheat.list.AbsolutePosition
-								local listSize = cheat.list.AbsoluteSize
-								
-								-- Check if click is outside the dropdown container and list
-								local inContainer = mousePos.X >= containerPos.X and mousePos.X <= containerPos.X + containerSize.X and
-								                     mousePos.Y >= containerPos.Y and mousePos.Y <= containerPos.Y + containerSize.Y
-								local inList = mousePos.X >= listPos.X and mousePos.X <= listPos.X + listSize.X and
-								               mousePos.Y >= listPos.Y and mousePos.Y <= listPos.Y + listSize.Y
-								
-								if not inContainer and not inList then
-									cheat.fadelist()
-								end
+								-- Use a small delay to check if click was on dropdown or list
+								task.spawn(function()
+									task.wait(0.1)
+									if not cheat.dropped then return end
+									
+									local mousePos = Vector2.new(mouse.X, mouse.Y)
+									local containerPos = cheat.container.AbsolutePosition
+									local containerSize = cheat.container.AbsoluteSize
+									local listPos = cheat.list.AbsolutePosition
+									local listSize = cheat.list.AbsoluteSize
+									
+									-- Check if click is outside the dropdown container and list
+									local inContainer = mousePos.X >= containerPos.X and mousePos.X <= containerPos.X + containerSize.X and
+									                     mousePos.Y >= containerPos.Y and mousePos.Y <= containerPos.Y + containerSize.Y
+									local inList = mousePos.X >= listPos.X and mousePos.X <= listPos.X + listSize.X and
+									               mousePos.Y >= listPos.Y and mousePos.Y <= listPos.Y + listSize.Y
+									
+									if not inContainer and not inList then
+										cheat.fadelist()
+									end
+								end)
 							end
 						end)
 						
