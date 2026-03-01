@@ -853,16 +853,23 @@ function finity.new(isdark, gprojectName, thinProject)
 								end
 								
 								if keybindData.key and not waitingForInput then
+									-- Use a separate connection that fires before Process is set
 									keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+										-- Don't check Process - allow all key presses to work
+										-- This allows F, C, V and other game-processed keys to work
+										
 										-- Check if chat is open (don't trigger if typing in chat)
 										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
 										if chatBox then return end
 										
-										-- Allow keybind to work even if Process is true (for F, C, V keys)
-										-- Only skip if it's the toggle key being processed
-										if Process and Input.KeyCode == finityData.ToggleKey then return end
+										-- Skip if it's the toggle key (to prevent menu toggle conflicts)
+										if Input.KeyCode == finityData.ToggleKey then return end
 										
-										if Input.KeyCode == keybindData.key and not waitingForInput then
+										-- Check if waiting for input
+										if waitingForInput then return end
+										
+										-- Trigger the toggle
+										if Input.KeyCode == keybindData.key then
 											toggleCheckbox()
 										end
 									end)
@@ -2263,14 +2270,17 @@ function finity.new(isdark, gprojectName, thinProject)
 							
 							if keybindKey then
 								keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+									-- Don't check Process - allow all key presses to work
+									-- This allows F, C, V and other game-processed keys to work
+									
 									-- Check if chat is open (don't trigger if typing in chat)
 									local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
 									if chatBox then return end
 									
-									-- Allow keybind to work even if Process is true (for F, C, V keys)
-									-- Only skip if it's the toggle key being processed
-									if Process and Input.KeyCode == finityData.ToggleKey then return end
+									-- Skip if it's the toggle key (to prevent menu toggle conflicts)
+									if Input.KeyCode == finityData.ToggleKey then return end
 									
+									-- Trigger the callback
 									if Input.KeyCode == keybindKey then
 										if callback then
 											local s, e = pcall(function()
