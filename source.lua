@@ -933,7 +933,11 @@ function finity.new(isdark, gprojectName, thinProject)
 								
 								-- Disable keybind listener while waiting for input
 								if keybindConnection then
-									keybindConnection:Disconnect()
+									if typeof(keybindConnection) == "RBXScriptConnection" then
+										keybindConnection:Disconnect()
+									elseif finity.gs["ContextActionService"] and keybindData.key then
+										finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
+									end
 									keybindConnection = nil
 								end
 								
@@ -960,7 +964,11 @@ function finity.new(isdark, gprojectName, thinProject)
 											updateKeybindText()
 											
 											if keybindConnection then
-												keybindConnection:Disconnect()
+												if typeof(keybindConnection) == "RBXScriptConnection" then
+													keybindConnection:Disconnect()
+												elseif finity.gs["ContextActionService"] and keybindData.key then
+													finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
+												end
 												keybindConnection = nil
 											end
 											
@@ -979,7 +987,11 @@ function finity.new(isdark, gprojectName, thinProject)
 								updateKeybindText()
 								
 								if keybindConnection then
-									keybindConnection:Disconnect()
+									if typeof(keybindConnection) == "RBXScriptConnection" then
+										keybindConnection:Disconnect()
+									elseif finity.gs["ContextActionService"] and keybindData.key then
+										finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
+									end
 									keybindConnection = nil
 								end
 							end)
@@ -2296,7 +2308,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								if typeof(keybindConnection) == "RBXScriptConnection" then
 									keybindConnection:Disconnect()
 								end
-								if finity.gs["ContextActionService"] then
+								if finity.gs["ContextActionService"] and keybindKey then
 									finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
 								end
 								keybindConnection = nil
@@ -2407,7 +2419,11 @@ function finity.new(isdark, gprojectName, thinProject)
 										updateButtonText()
 										
 										if keybindConnection then
-											keybindConnection:Disconnect()
+											if typeof(keybindConnection) == "RBXScriptConnection" then
+												keybindConnection:Disconnect()
+											elseif finity.gs["ContextActionService"] and keybindKey then
+												finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
+											end
 											keybindConnection = nil
 										end
 										
@@ -2427,7 +2443,11 @@ function finity.new(isdark, gprojectName, thinProject)
 							updateButtonText()
 							
 							if keybindConnection then
-								keybindConnection:Disconnect()
+								if typeof(keybindConnection) == "RBXScriptConnection" then
+									keybindConnection:Disconnect()
+								elseif finity.gs["ContextActionService"] and keybindKey then
+									finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
+								end
 								keybindConnection = nil
 							end
 						end)
