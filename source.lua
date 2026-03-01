@@ -1310,7 +1310,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								
 								local button = finity:Create("TextButton", {
 									BackgroundColor3 = theme.dropdown_background,
-									BackgroundTransparency = isSelected and 0.5 or 1,
+									BackgroundTransparency = isSelected and 0.2 or 1,
 									BorderSizePixel = 0,
 									Size = UDim2.new(1, 0, 0, 20),
 									ZIndex = 3,
@@ -1344,7 +1344,8 @@ function finity.new(isdark, gprojectName, thinProject)
 									if not currentSelected then
 										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 1}):Play()
 									else
-										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.3}):Play()
+										-- Use lower transparency (more opaque) for darker selected appearance
+										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.2}):Play()
 									end
 								end)
 								button.MouseButton1Click:Connect(function()
@@ -1369,9 +1370,9 @@ function finity.new(isdark, gprojectName, thinProject)
 									local currentSelected = not found
 									-- Ensure background color is set correctly
 									button.BackgroundColor3 = theme.dropdown_background
-									-- Use lower transparency for darker appearance when selected
+									-- Use lower transparency (more opaque) for darker selected appearance
 									finity.gs["TweenService"]:Create(button, TweenInfo.new(0.2), {
-										BackgroundTransparency = currentSelected and 0.5 or 1
+										BackgroundTransparency = currentSelected and 0.2 or 1
 									}):Play()
 									
 									-- Refresh all buttons to update their states
@@ -1386,9 +1387,9 @@ function finity.new(isdark, gprojectName, thinProject)
 											end
 											-- Ensure background color is set correctly
 											btn.BackgroundColor3 = theme.dropdown_background
-											-- Use lower transparency for darker appearance when selected
+											-- Use lower transparency (more opaque) for darker selected appearance
 											finity.gs["TweenService"]:Create(btn, TweenInfo.new(0.2), {
-												BackgroundTransparency = btnIsSelected and 0.5 or 1
+												BackgroundTransparency = btnIsSelected and 0.2 or 1
 											}):Play()
 										end
 									end
@@ -1405,7 +1406,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								
 								-- Show button if dropdown is open
 								if wasOpen then
-									finity.gs["TweenService"]:Create(button, TweenInfo.new(0), {BackgroundTransparency = isSelected and 0.5 or 1}):Play()
+									finity.gs["TweenService"]:Create(button, TweenInfo.new(0), {BackgroundTransparency = isSelected and 0.2 or 1}):Play()
 								else
 									finity.gs["TweenService"]:Create(button, TweenInfo.new(0), {BackgroundTransparency = 1}):Play()
 								end
@@ -1450,7 +1451,7 @@ function finity.new(isdark, gprojectName, thinProject)
 											end
 										end
 										finity.gs["TweenService"]:Create(button, TweenInfo.new(0.2), {
-											BackgroundTransparency = isSelected and 0.5 or 1
+											BackgroundTransparency = isSelected and 0.2 or 1
 										}):Play()
 									end
 								end
