@@ -149,10 +149,16 @@ function finity.keybinds:Register(key, callback, name)
 		CAS:BindActionAtPriority(
 			actionName,
 			function(actionName, inputState, inputObject)
+				-- Debug: Print all input info
+				print("[Finity Keybind Debug] Action:", actionName, "State:", inputState, "Key:", key.Name, "InputObject:", inputObject)
+				
 				-- Only trigger on press (not release)
 				if inputState == Enum.UserInputState.Begin then
+					print("[Finity Keybind] Key pressed:", key.Name, "BindId:", bindId)
+					
 					-- Check chat
 					if isChatOpen() then
+						print("[Finity Keybind] Chat is open, ignoring key:", key.Name)
 						return Enum.ContextActionResult.Pass
 					end
 					
@@ -160,9 +166,12 @@ function finity.keybinds:Register(key, callback, name)
 					local currentTime = tick()
 					local lastTrigger = self.lastTriggerTime[bindId] or 0
 					if currentTime - lastTrigger < 0.05 then
+						print("[Finity Keybind] Debounced, ignoring:", key.Name)
 						return Enum.ContextActionResult.Sink
 					end
 					self.lastTriggerTime[bindId] = currentTime
+					
+					print("[Finity Keybind] Triggering callback for:", key.Name)
 					
 					-- Call the callback
 					if callback then
@@ -170,6 +179,8 @@ function finity.keybinds:Register(key, callback, name)
 							local success, err = pcall(callback, key)
 							if not success then
 								warn("Keybind error (" .. bindId .. "):", err)
+							else
+								print("[Finity Keybind] Callback executed successfully for:", key.Name)
 							end
 						end)
 					end
@@ -183,6 +194,8 @@ function finity.keybinds:Register(key, callback, name)
 			Enum.ContextActionPriority.High.Value, -- High priority (2000)
 			key
 		)
+		
+		print("[Finity Keybind] Registered keybind:", key.Name, "with action:", actionName)
 		
 	self.binds[bindId] = {
 		key = key,
