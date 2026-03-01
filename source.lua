@@ -1001,8 +1001,48 @@ function finity.new(isdark, gprojectName, thinProject)
 								waitingForInput = true
 								updateKeybindText()
 								
+								-- Print all currently pressed keys
+								local UIS = finity.gs["UserInputService"]
+								local pressedKeys = {}
+								print("[Finity Keybind] Waiting for keybind input...")
+								
+								-- Function to check and print all pressed keys
+								local function printPressedKeys()
+									local keys = {}
+									for _, keyCode in pairs(Enum.KeyCode:GetEnumItems()) do
+										if keyCode ~= Enum.KeyCode.Unknown then
+											local success, isDown = pcall(function()
+												return UIS:IsKeyDown(keyCode)
+											end)
+											if success and isDown then
+												table.insert(keys, keyCode.Name)
+											end
+										end
+									end
+									if #keys > 0 then
+										print("[Finity Keybind] Currently pressed keys:", table.concat(keys, ", "))
+									end
+								end
+								
+								-- Print pressed keys immediately
+								printPressedKeys()
+								
+								-- Continuously print pressed keys while waiting
+								local keyCheckConnection
+								keyCheckConnection = finity.gs["RunService"].Heartbeat:Connect(function()
+									if waitingForInput then
+										printPressedKeys()
+									else
+										if keyCheckConnection then
+											keyCheckConnection:Disconnect()
+											keyCheckConnection = nil
+										end
+									end
+								end)
+								
 								local inputConnection
 								inputConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+									print("[Finity Keybind] InputBegan detected - Key:", Input.KeyCode and Input.KeyCode.Name or "Unknown", "Process:", Process, "UserInputType:", Input.UserInputType.Name)
 									if Process then return end
 									
 									if Input.UserInputType == Enum.UserInputType.Keyboard then
@@ -1012,6 +1052,10 @@ function finity.new(isdark, gprojectName, thinProject)
 											updateKeybindText()
 											setupKeybindListener()
 											
+											if keyCheckConnection then
+												keyCheckConnection:Disconnect()
+												keyCheckConnection = nil
+											end
 											inputConnection:Disconnect()
 											inputConnection = nil
 										elseif Input.KeyCode == Enum.KeyCode.Backspace then
@@ -1028,6 +1072,10 @@ function finity.new(isdark, gprojectName, thinProject)
 												keybindConnection = nil
 											end
 											
+											if keyCheckConnection then
+												keyCheckConnection:Disconnect()
+												keyCheckConnection = nil
+											end
 											inputConnection:Disconnect()
 											inputConnection = nil
 										end
@@ -2422,8 +2470,47 @@ function finity.new(isdark, gprojectName, thinProject)
 							waitingForInput = true
 							updateButtonText()
 							
+							-- Print all currently pressed keys
+							local UIS = finity.gs["UserInputService"]
+							print("[Finity Keybind Button] Waiting for keybind input...")
+							
+							-- Function to check and print all pressed keys
+							local function printPressedKeys()
+								local keys = {}
+								for _, keyCode in pairs(Enum.KeyCode:GetEnumItems()) do
+									if keyCode ~= Enum.KeyCode.Unknown then
+										local success, isDown = pcall(function()
+											return UIS:IsKeyDown(keyCode)
+										end)
+										if success and isDown then
+											table.insert(keys, keyCode.Name)
+										end
+									end
+								end
+								if #keys > 0 then
+									print("[Finity Keybind Button] Currently pressed keys:", table.concat(keys, ", "))
+								end
+							end
+							
+							-- Print pressed keys immediately
+							printPressedKeys()
+							
+							-- Continuously print pressed keys while waiting
+							local keyCheckConnection
+							keyCheckConnection = finity.gs["RunService"].Heartbeat:Connect(function()
+								if waitingForInput then
+									printPressedKeys()
+								else
+									if keyCheckConnection then
+										keyCheckConnection:Disconnect()
+										keyCheckConnection = nil
+									end
+								end
+							end)
+							
 							local inputConnection
 							inputConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+								print("[Finity Keybind Button] InputBegan detected - Key:", Input.KeyCode and Input.KeyCode.Name or "Unknown", "Process:", Process, "UserInputType:", Input.UserInputType.Name)
 								if Process then return end
 								
 								if Input.UserInputType == Enum.UserInputType.Keyboard then
@@ -2441,6 +2528,10 @@ function finity.new(isdark, gprojectName, thinProject)
 											if not s then warn("error: ".. e) end
 										end
 										
+										if keyCheckConnection then
+											keyCheckConnection:Disconnect()
+											keyCheckConnection = nil
+										end
 										inputConnection:Disconnect()
 										inputConnection = nil
 									elseif Input.KeyCode == Enum.KeyCode.Backspace then
@@ -2458,6 +2549,10 @@ function finity.new(isdark, gprojectName, thinProject)
 											keybindConnection = nil
 										end
 										
+										if keyCheckConnection then
+											keyCheckConnection:Disconnect()
+											keyCheckConnection = nil
+										end
 										inputConnection:Disconnect()
 										inputConnection = nil
 									end
