@@ -1622,6 +1622,40 @@ function finity.new(isdark, gprojectName, thinProject)
 							SliceScale = 0.02,
 						})
 
+						-- Min value label (top left)
+						cheat.minLabel = finity:Create("TextLabel", {
+							Name = "MinLabel",
+							AnchorPoint = Vector2.new(0, 1),
+							BackgroundColor3 = Color3.new(1, 1, 1),
+							BackgroundTransparency = 1,
+							Position = UDim2.new(1, 0, 0.5, -8),
+							Size = UDim2.new(0, 50, 0, 10),
+							ZIndex = 2,
+							Font = Enum.Font.Gotham,
+							Text = tostring(minimum) .. suffix,
+							TextColor3 = theme.slider_text,
+							TextSize = 10,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextYAlignment = Enum.TextYAlignment.Bottom
+						})
+
+						-- Max value label (top right)
+						cheat.maxLabel = finity:Create("TextLabel", {
+							Name = "MaxLabel",
+							AnchorPoint = Vector2.new(1, 1),
+							BackgroundColor3 = Color3.new(1, 1, 1),
+							BackgroundTransparency = 1,
+							Position = UDim2.new(1, 0, 0.5, -8),
+							Size = UDim2.new(0, 50, 0, 10),
+							ZIndex = 2,
+							Font = Enum.Font.Gotham,
+							Text = tostring(maximum) .. suffix,
+							TextColor3 = theme.slider_text,
+							TextSize = 10,
+							TextXAlignment = Enum.TextXAlignment.Right,
+							TextYAlignment = Enum.TextYAlignment.Bottom
+						})
+
 						cheat.numbervalue = finity:Create("TextLabel", {
 							Name = "Value",
 							AnchorPoint = Vector2.new(0, 0.5),
@@ -1779,6 +1813,8 @@ function finity.new(isdark, gprojectName, thinProject)
 
 						cheat.visiframe.Parent = cheat.sliderbar
 						cheat.numbervalue.Parent = cheat.sliderbar
+						cheat.minLabel.Parent = cheat.container
+						cheat.maxLabel.Parent = cheat.container
 						cheat.sliderbar.Parent = cheat.container
 					elseif string.lower(kind) == "button" then
 						local button_text = data and data.text
