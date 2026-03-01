@@ -110,10 +110,55 @@ function finity.config:Set(key, value)
 	self:Save()
 end
 
--- Global Keybind Manager
+-- Global Keybind Manager with separate thread for game-processed keys
 finity.keybinds = {}
 finity.keybinds.binds = {}
 finity.keybinds.connections = {}
+finity.keybinds.threadRunning = false
+finity.keybinds.keyStates = {} -- Track last pressed state for each key
+
+-- Separate thread that constantly checks key states using IsKeyDown
+function finity.keybinds:StartKeybindThread()
+	if self.threadRunning then return end
+	self.threadRunning = true
+	
+	task.spawn(function()
+		while self.threadRunning do
+			pcall(function()
+				-- Check if chat is open
+				local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
+				local chatOpen = chatBox ~= nil
+				
+				-- Check all registered keybinds
+				for bindId, bindData in pairs(self.binds) do
+					if bindData.key and not chatOpen then
+						local isPressed = finity.gs["UserInputService"]:IsKeyDown(bindData.key)
+						local lastState = self.keyStates[bindId] or false
+						
+						-- Key was just pressed (edge detection)
+						if isPressed and not lastState then
+							self.keyStates[bindId] = true
+							-- Call the callback
+							if bindData.callback then
+								local success, err = pcall(bindData.callback, bindData.key)
+								if not success then
+									warn("Keybind error (" .. bindId .. "):", err)
+								end
+							end
+						elseif not isPressed then
+							self.keyStates[bindId] = false
+						end
+					elseif chatOpen then
+						-- Reset state when chat opens
+						self.keyStates[bindId] = false
+					end
+				end
+			end)
+			
+			task.wait(0.01) -- Check every 10ms for responsiveness
+		end
+	end)
+end
 
 function finity.keybinds:Register(key, callback, name)
 	if not key or not callback then return end
@@ -131,25 +176,27 @@ function finity.keybinds:Register(key, callback, name)
 		name = bindId
 	}
 	
-	local connection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Processed)
-		if not Processed and Input.KeyCode == key then
-			local success, err = pcall(callback, Input)
-			if not success then
-				warn("Keybind error (" .. bindId .. "):", err)
-			end
-		end
-	end)
+	-- Start the thread if not already running
+	self:StartKeybindThread()
 	
-	self.connections[bindId] = connection
 	return bindId
 end
 
 function finity.keybinds:Unregister(bindId)
+	-- Remove from binds and keyStates
+	if self.binds[bindId] then
+		self.binds[bindId] = nil
+		if self.keyStates then
+			self.keyStates[bindId] = nil
+		end
+	end
+	-- Disconnect if it's a connection
 	if self.connections[bindId] then
-		self.connections[bindId]:Disconnect()
+		if typeof(self.connections[bindId]) == "RBXScriptConnection" then
+			self.connections[bindId]:Disconnect()
+		end
 		self.connections[bindId] = nil
 	end
-	self.binds[bindId] = nil
 end
 
 function finity.keybinds:Clear()
@@ -845,63 +892,28 @@ function finity.new(isdark, gprojectName, thinProject)
 
 							updateKeybindText()
 
-							-- Setup keybind listener for toggling checkbox
+							-- Setup keybind listener for toggling checkbox using global keybind manager
 							local function setupKeybindListener()
 								if keybindConnection then
-									if typeof(keybindConnection) == "RBXScriptConnection" then
+									-- Unregister from global keybind manager
+									if typeof(keybindConnection) == "string" then
+										finity.keybinds:Unregister(keybindConnection)
+									elseif typeof(keybindConnection) == "RBXScriptConnection" then
 										keybindConnection:Disconnect()
 									elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindData.key then
-										-- ContextActionService was used, unbind it
 										finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
 									end
 									keybindConnection = nil
 								end
 								
 								if keybindData.key and not waitingForInput then
-									local lastPressedTime = 0
-									
-									-- Use ContextActionService with high priority to override game keybinds
-									if finity.gs["ContextActionService"] then
-										local actionName = "FinityKeybind_" .. tostring(keybindData.key)
-										-- Bind with high priority (2000) to override game actions
-										finity.gs["ContextActionService"]:BindActionAtPriority(actionName, function(actionName, inputState, inputObject)
-											if waitingForInput then return Enum.ContextActionResult.Pass end
-											
-											-- Check if chat is open
-											local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-											if chatBox then return Enum.ContextActionResult.Pass end
-											
-											if inputState == Enum.UserInputState.Begin then
-												local currentTime = tick()
-												if currentTime - lastPressedTime > 0.15 then
-													lastPressedTime = currentTime
-													toggleCheckbox()
-													-- Sink the input to prevent game from processing it
-													return Enum.ContextActionResult.Sink
-												end
-											end
-											return Enum.ContextActionResult.Pass
-										end, false, Enum.ContextActionPriority.High.Value, keybindData.key)
-										keybindConnection = true -- Mark as connected
-									else
-										-- Fallback: Use InputBegan with immediate connection
-										local lastPressed = false
-										keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
-											if waitingForInput then return end
-											
-											local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-											if chatBox then return end
-											
-											-- Don't check Process - capture ALL key presses
-											if Input.KeyCode == keybindData.key then
-												local currentTime = tick()
-												if currentTime - lastPressedTime > 0.15 then
-													lastPressedTime = currentTime
-													toggleCheckbox()
-												end
-											end
-										end)
-									end
+									-- Use global keybind manager with separate thread - works with ALL keys
+									local bindId = "FinityCheckbox_" .. tostring(keybindData.key) .. "_" .. tostring(cheat.frame)
+									keybindConnection = finity.keybinds:Register(keybindData.key, function(key)
+										if not waitingForInput then
+											toggleCheckbox()
+										end
+									end, bindId)
 								end
 							end
 
@@ -2316,65 +2328,29 @@ function finity.new(isdark, gprojectName, thinProject)
 						updateButtonText()
 						
 						local function setupKeybindListener()
-								if keybindConnection then
-									if typeof(keybindConnection) == "RBXScriptConnection" then
-										keybindConnection:Disconnect()
-									elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindKey then
-										finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
-									end
-									keybindConnection = nil
+							if keybindConnection then
+								-- Unregister from global keybind manager
+								if typeof(keybindConnection) == "string" then
+									finity.keybinds:Unregister(keybindConnection)
+								elseif typeof(keybindConnection) == "RBXScriptConnection" then
+									keybindConnection:Disconnect()
+								elseif keybindConnection == true and finity.gs["ContextActionService"] and keybindKey then
+									finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
 								end
+								keybindConnection = nil
+							end
 							
 							if keybindKey then
-								local lastPressedTime = 0
-								
-								-- Use ContextActionService with high priority to override game keybinds
-								if finity.gs["ContextActionService"] then
-									local actionName = "FinityKeybindBtn_" .. tostring(keybindKey)
-									-- Bind with high priority (2000) to override game actions
-									finity.gs["ContextActionService"]:BindActionAtPriority(actionName, function(actionName, inputState, inputObject)
-										-- Check if chat is open
-										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-										if chatBox then return Enum.ContextActionResult.Pass end
-										
-										if inputState == Enum.UserInputState.Begin then
-											local currentTime = tick()
-											if currentTime - lastPressedTime > 0.15 then
-												lastPressedTime = currentTime
-												if callback then
-													local s, e = pcall(function()
-														callback(keybindKey)
-													end)
-													if not s then warn("error: ".. e) end
-												end
-												-- Sink the input to prevent game from processing it
-												return Enum.ContextActionResult.Sink
-											end
-										end
-										return Enum.ContextActionResult.Pass
-									end, false, Enum.ContextActionPriority.High.Value, keybindKey)
-									keybindConnection = true -- Mark as connected
-								else
-									-- Fallback: Use InputBegan with immediate connection
-									keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
-										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-										if chatBox then return end
-										
-										-- Don't check Process - capture ALL key presses
-										if Input.KeyCode == keybindKey then
-											local currentTime = tick()
-											if currentTime - lastPressedTime > 0.15 then
-												lastPressedTime = currentTime
-												if callback then
-													local s, e = pcall(function()
-														callback(keybindKey)
-													end)
-													if not s then warn("error: ".. e) end
-												end
-											end
-										end
-									end)
-								end
+								-- Use global keybind manager with separate thread - works with ALL keys
+								local bindId = "FinityKeybindBtn_" .. tostring(keybindKey) .. "_" .. tostring(cheat.frame)
+								keybindConnection = finity.keybinds:Register(keybindKey, function(key)
+									if callback then
+										local s, e = pcall(function()
+											callback(key)
+										end)
+										if not s then warn("error: ".. e) end
+									end
+								end, bindId)
 							end
 						end
 						
