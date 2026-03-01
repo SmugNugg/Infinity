@@ -854,7 +854,15 @@ function finity.new(isdark, gprojectName, thinProject)
 								
 								if keybindData.key and not waitingForInput then
 									keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
-										if not Process and Input.KeyCode == keybindData.key and not waitingForInput then
+										-- Check if chat is open (don't trigger if typing in chat)
+										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
+										if chatBox then return end
+										
+										-- Allow keybind to work even if Process is true (for F, C, V keys)
+										-- Only skip if it's the toggle key being processed
+										if Process and Input.KeyCode == finityData.ToggleKey then return end
+										
+										if Input.KeyCode == keybindData.key and not waitingForInput then
 											toggleCheckbox()
 										end
 									end)
@@ -2255,7 +2263,15 @@ function finity.new(isdark, gprojectName, thinProject)
 							
 							if keybindKey then
 								keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
-									if not Process and Input.KeyCode == keybindKey then
+									-- Check if chat is open (don't trigger if typing in chat)
+									local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
+									if chatBox then return end
+									
+									-- Allow keybind to work even if Process is true (for F, C, V keys)
+									-- Only skip if it's the toggle key being processed
+									if Process and Input.KeyCode == finityData.ToggleKey then return end
+									
+									if Input.KeyCode == keybindKey then
 										if callback then
 											local s, e = pcall(function()
 												callback(keybindKey)
