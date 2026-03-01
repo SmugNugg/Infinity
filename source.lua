@@ -804,7 +804,7 @@ function finity.new(isdark, gprojectName, thinProject)
 						if keybindData.key then
 							local waitingForInput = false
 							
-							cheat.keybindBtn = finity:Create("ImageLabel", {
+							cheat.keybindBtn = finity:Create("ImageButton", {
 								Name = "KeybindButton",
 								AnchorPoint = Vector2.new(1, 0.5),
 								BackgroundColor3 = Color3.new(1, 1, 1),
@@ -863,37 +863,26 @@ function finity.new(isdark, gprojectName, thinProject)
 
 							setupKeybindListener()
 
-							-- Make keybind button interactive
-							local keybindButton = finity:Create("TextButton", {
-								Name = "KeybindButtonInteractive",
-								BackgroundColor3 = Color3.new(1, 1, 1),
-								BackgroundTransparency = 1,
-								Size = UDim2.new(1, 0, 1, 0),
-								ZIndex = 4,
-								Font = Enum.Font.Gotham,
-								Text = "",
-								TextTransparency = 1
-							})
-
-							keybindButton.MouseEnter:Connect(function()
+							-- Make keybind button interactive (using ImageButton directly)
+							cheat.keybindBtn.MouseEnter:Connect(function()
 								if not waitingForInput then
 									finity.gs["TweenService"]:Create(cheat.keybindBtn, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_hover}):Play()
 								end
 							end)
 
-							keybindButton.MouseLeave:Connect(function()
+							cheat.keybindBtn.MouseLeave:Connect(function()
 								if not waitingForInput then
 									finity.gs["TweenService"]:Create(cheat.keybindBtn, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
 								end
 							end)
 
-							keybindButton.MouseButton1Down:Connect(function()
+							cheat.keybindBtn.MouseButton1Down:Connect(function()
 								if not waitingForInput then
 									finity.gs["TweenService"]:Create(cheat.keybindBtn, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_down}):Play()
 								end
 							end)
 
-							keybindButton.MouseButton1Up:Connect(function()
+							cheat.keybindBtn.MouseButton1Up:Connect(function()
 								if waitingForInput then return end
 								
 								finity.gs["TweenService"]:Create(cheat.keybindBtn, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
@@ -932,7 +921,7 @@ function finity.new(isdark, gprojectName, thinProject)
 								end)
 							end)
 
-							keybindButton.MouseButton2Up:Connect(function()
+							cheat.keybindBtn.MouseButton2Up:Connect(function()
 								if waitingForInput then return end
 								
 								-- Right click to clear
@@ -946,7 +935,6 @@ function finity.new(isdark, gprojectName, thinProject)
 							end)
 
 							cheat.keybindText.Parent = cheat.keybindBtn
-							keybindButton.Parent = cheat.keybindBtn
 							cheat.keybindBtn.Parent = cheat.container
 
 							-- Method to change keybind programmatically
