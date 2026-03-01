@@ -200,13 +200,25 @@ AimbotHotkeys:Cheat("button", "Reset Key", function()
     panicHotkey:SetValue(nil)  -- Clear keybind
 end)
 
--- Keybind Button Example (displays key and triggers on press)
-local teleportKey = AimbotHotkeys:Cheat("keybindbutton", "Teleport Key", function()
-    print("Teleport activated!")
+-- Keybind Button Example (click to bind, triggers on press)
+local teleportKey = AimbotHotkeys:Cheat("keybindbutton", "Teleport Key", function(key)
+    print("Teleport activated with key:", key)
 end, {
-    key = Enum.KeyCode.T,
-    text = "Teleport"
+    key = Enum.KeyCode.T,  -- Optional: default keybind
+    text = "Teleport"       -- Optional: shown when no key is bound
 })
+
+-- You can also connect the callback later
+teleportKey:Connect(function(key)
+    print("Teleport key pressed:", key)
+end)
+
+-- Usage:
+-- - Click the button to enter "Waiting for keybind..." mode
+-- - Press any key (e.g., D) to bind it
+-- - The button will show the key name (e.g., "D")
+-- - The callback will fire automatically when the key is pressed
+-- - Right-click to clear the keybind
 
 -- Keybind Input (allows rebinding)
 local aimbotKeybind = AimbotHotkeys:Cheat("keybind", "Aimbot Toggle", function(key)

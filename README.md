@@ -155,27 +155,34 @@ keybind:SetValue(Enum.KeyCode.G)
 - Auto-triggers - Callback fires when key is pressed
 - Can be cleared - Right click or press Backspace
 
-### Keybind Button (Display & Trigger - Non-Rebindable)
+### Keybind Button (Click to Bind & Trigger)
 
-Displays a keybind as a button that triggers on press, but doesn't allow rebinding.
+A proper keybind button that allows users to click and bind a key, then triggers when that key is pressed.
 
 ```lua
-local keybindBtn = sector:Cheat("keybindbutton", "Teleport", function()
-    print("Teleporting...")
+local keybindBtn = sector:Cheat("keybindbutton", "Teleport", function(key)
+    print("Teleport activated with key:", key)
 end, {
-    key = Enum.KeyCode.T,
-    text = "Teleport"  -- Optional: button text
+    key = Enum.KeyCode.T,  -- Optional: default keybind
+    text = "Teleport"      -- Optional: button text (shown when no key is bound)
 })
 
+-- Or connect the callback later
+keybindBtn:Connect(function(key)
+    print("Key pressed:", key)
+end)
+
 -- Methods
-keybindBtn:SetKey(Enum.KeyCode.R)  -- Change the key
-keybindBtn:SetText("Quick Teleport")  -- Change the button text
+keybindBtn:SetKey(Enum.KeyCode.G)  -- Change the key programmatically
+keybindBtn:SetText("New Text")     -- Change the button text
 
 -- Usage:
--- - Displays as: "Teleport [T]"
--- - Clicking the button triggers the callback
--- - Pressing T also triggers the callback automatically
--- - Cannot be rebound by user (use "keybind" for that)
+-- - Click the button to enter "Waiting for keybind..." mode
+-- - Press any key (e.g., D) to bind it
+-- - The button will show the key name (e.g., "D")
+-- - The callback will fire automatically when the key is pressed
+-- - Right-click to clear the keybind
+-- - Press Backspace while binding to clear
 ```
 
 ### Color Picker

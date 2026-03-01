@@ -1622,13 +1622,13 @@ function finity.new(isdark, gprojectName, thinProject)
 							SliceScale = 0.02,
 						})
 
-						-- Min value label (top left)
+						-- Min value label (top left, above slider)
 						cheat.minLabel = finity:Create("TextLabel", {
 							Name = "MinLabel",
 							AnchorPoint = Vector2.new(0, 1),
 							BackgroundColor3 = Color3.new(1, 1, 1),
 							BackgroundTransparency = 1,
-							Position = UDim2.new(1, 0, 0.5, -8),
+							Position = UDim2.new(0, 0, 0.5, -8),
 							Size = UDim2.new(0, 50, 0, 10),
 							ZIndex = 2,
 							Font = Enum.Font.Gotham,
@@ -1639,7 +1639,7 @@ function finity.new(isdark, gprojectName, thinProject)
 							TextYAlignment = Enum.TextYAlignment.Bottom
 						})
 
-						-- Max value label (top right)
+						-- Max value label (top right, above slider)
 						cheat.maxLabel = finity:Create("TextLabel", {
 							Name = "MaxLabel",
 							AnchorPoint = Vector2.new(1, 1),
@@ -2036,6 +2036,8 @@ function finity.new(isdark, gprojectName, thinProject)
 					elseif string.lower(kind) == "keybindbutton" or string.lower(kind) == "keybindbtn" then
 						local keybindKey = data and data.key or nil
 						local keybindText = data and data.text or "Keybind"
+						local keybindConnection = nil
+						local waitingForInput = false
 						
 						cheat.value = keybindKey
 						
@@ -2053,6 +2055,16 @@ function finity.new(isdark, gprojectName, thinProject)
 							SliceScale = 0.02
 						})
 						
+						local function updateButtonText()
+							if waitingForInput then
+								cheat.button.Text = "Waiting for keybind..."
+							elseif keybindKey then
+								cheat.button.Text = tostring(keybindKey.Name)
+							else
+								cheat.button.Text = keybindText
+							end
+						end
+						
 						cheat.button = finity:Create("TextButton", {
 							Name = "Button",
 							BackgroundColor3 = Color3.new(1, 1, 1),
@@ -2061,56 +2073,132 @@ function finity.new(isdark, gprojectName, thinProject)
 							Size = UDim2.new(1, 0, 1, 0),
 							ZIndex = 2,
 							Font = Enum.Font.Gotham,
-							Text = keybindKey and (keybindText .. " [" .. tostring(keybindKey.Name) .. "]") or keybindText,
+							Text = keybindKey and tostring(keybindKey.Name) or keybindText,
 							TextColor3 = theme.textbox_text,
 							TextSize = 13,
 							TextXAlignment = Enum.TextXAlignment.Center
 						})
 						
+						updateButtonText()
+						
+						local function setupKeybindListener()
+							if keybindConnection then
+								keybindConnection:Disconnect()
+								keybindConnection = nil
+							end
+							
+							if keybindKey then
+								keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+									if not Process and Input.KeyCode == keybindKey then
+										if callback then
+											local s, e = pcall(function()
+												callback(keybindKey)
+											end)
+											if not s then warn("error: ".. e) end
+										end
+									end
+								end)
+							end
+						end
+						
 						cheat.button.MouseEnter:Connect(function()
-							finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_hover}):Play()
+							if not waitingForInput then
+								finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_hover}):Play()
+							end
 						end)
 						cheat.button.MouseLeave:Connect(function()
-							finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
+							if not waitingForInput then
+								finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
+							end
 						end)
 						cheat.button.MouseButton1Down:Connect(function()
-							finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_down}):Play()
+							if not waitingForInput then
+								finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background_down}):Play()
+							end
 						end)
 						cheat.button.MouseButton1Up:Connect(function()
+							if waitingForInput then return end
+							
 							finity.gs["TweenService"]:Create(cheat.background, TweenInfo.new(0.2), {ImageColor3 = theme.button_background}):Play()
 							
-							if callback then
-								local s, e = pcall(function()
-									callback(keybindKey)
-								end)
+							-- Start waiting for keybind
+							waitingForInput = true
+							updateButtonText()
+							
+							local inputConnection
+							inputConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+								if Process then return end
 								
-								if not s then warn("error: ".. e) end
+								if Input.UserInputType == Enum.UserInputType.Keyboard then
+									if Input.KeyCode ~= finityData.ToggleKey and Input.KeyCode ~= Enum.KeyCode.Backspace then
+										keybindKey = Input.KeyCode
+										cheat.value = keybindKey
+										waitingForInput = false
+										updateButtonText()
+										setupKeybindListener()
+										
+										if callback then
+											local s, e = pcall(function()
+												callback(keybindKey)
+											end)
+											if not s then warn("error: ".. e) end
+										end
+										
+										inputConnection:Disconnect()
+										inputConnection = nil
+									elseif Input.KeyCode == Enum.KeyCode.Backspace then
+										keybindKey = nil
+										cheat.value = nil
+										waitingForInput = false
+										updateButtonText()
+										
+										if keybindConnection then
+											keybindConnection:Disconnect()
+											keybindConnection = nil
+										end
+										
+										inputConnection:Disconnect()
+										inputConnection = nil
+									end
+								end
+							end)
+						end)
+						
+						cheat.button.MouseButton2Up:Connect(function()
+							if waitingForInput then return end
+							
+							-- Right click to clear
+							keybindKey = nil
+							cheat.value = nil
+							updateButtonText()
+							
+							if keybindConnection then
+								keybindConnection:Disconnect()
+								keybindConnection = nil
 							end
 						end)
 						
 						function cheat:SetKey(key)
 							cheat.value = key
 							keybindKey = key
-							cheat.button.Text = key and (keybindText .. " [" .. tostring(key.Name) .. "]") or keybindText
+							waitingForInput = false
+							updateButtonText()
+							setupKeybindListener()
 						end
 						
 						function cheat:SetText(text)
 							keybindText = text
-							cheat.button.Text = keybindKey and (keybindText .. " [" .. tostring(keybindKey.Name) .. "]") or keybindText
+							updateButtonText()
 						end
 						
-						-- Auto-trigger when key is pressed
-						if keybindKey then
-							finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
-								if not Process and Input.KeyCode == keybindKey then
-									if callback then
-										local s, e = pcall(function()
-											callback(keybindKey)
-										end)
-										if not s then warn("error: ".. e) end
-									end
-								end
-							end)
+						function cheat:Connect(callbackFunc)
+							callback = callbackFunc
+							setupKeybindListener()
+						end
+						
+						-- Setup initial keybind listener if key exists
+						if callback then
+							setupKeybindListener()
 						end
 						
 						cheat.background.Parent = cheat.container
