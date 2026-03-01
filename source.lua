@@ -850,20 +850,21 @@ function finity.new(isdark, gprojectName, thinProject)
 								if keybindConnection then
 									if typeof(keybindConnection) == "RBXScriptConnection" then
 										keybindConnection:Disconnect()
-									elseif finity.gs["ContextActionService"] then
+									end
+									if finity.gs["ContextActionService"] then
 										finity.gs["ContextActionService"]:UnbindAction("FinityKeybind_" .. tostring(keybindData.key))
 									end
 									keybindConnection = nil
 								end
 								
 								if keybindData.key and not waitingForInput then
-									local lastPressed = false
 									local lastPressedTime = 0
 									
-									-- Use ContextActionService to override game keybinds
+									-- Use ContextActionService with high priority to override game keybinds
 									if finity.gs["ContextActionService"] then
 										local actionName = "FinityKeybind_" .. tostring(keybindData.key)
-										finity.gs["ContextActionService"]:BindAction(actionName, function(actionName, inputState, inputObject)
+										-- Bind with high priority (2000) to override game actions
+										finity.gs["ContextActionService"]:BindActionAtPriority(actionName, function(actionName, inputState, inputObject)
 											if waitingForInput then return Enum.ContextActionResult.Pass end
 											
 											-- Check if chat is open
@@ -872,40 +873,32 @@ function finity.new(isdark, gprojectName, thinProject)
 											
 											if inputState == Enum.UserInputState.Begin then
 												local currentTime = tick()
-												if currentTime - lastPressedTime > 0.1 then
+												if currentTime - lastPressedTime > 0.15 then
 													lastPressedTime = currentTime
 													toggleCheckbox()
+													-- Sink the input to prevent game from processing it
 													return Enum.ContextActionResult.Sink
 												end
 											end
 											return Enum.ContextActionResult.Pass
-										end, false, true, keybindData.key)
+										end, false, Enum.ContextActionPriority.High.Value, keybindData.key)
 										keybindConnection = true -- Mark as connected
 									else
-										-- Fallback to RunService if ContextActionService not available
-										keybindConnection = finity.gs["RunService"].Heartbeat:Connect(function()
-											if waitingForInput then 
-												lastPressed = false
-												return 
-											end
+										-- Fallback: Use InputBegan with immediate connection
+										local lastPressed = false
+										keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
+											if waitingForInput then return end
 											
 											local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-											if chatBox then 
-												lastPressed = false
-												return 
-											end
+											if chatBox then return end
 											
-											local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindData.key)
-											local currentTime = tick()
-											
-											if isPressed and not lastPressed then
-												if currentTime - lastPressedTime > 0.1 then
-													lastPressed = true
+											-- Don't check Process - capture ALL key presses
+											if Input.KeyCode == keybindData.key then
+												local currentTime = tick()
+												if currentTime - lastPressedTime > 0.15 then
 													lastPressedTime = currentTime
 													toggleCheckbox()
 												end
-											elseif not isPressed then
-												lastPressed = false
 											end
 										end)
 									end
@@ -2302,7 +2295,8 @@ function finity.new(isdark, gprojectName, thinProject)
 							if keybindConnection then
 								if typeof(keybindConnection) == "RBXScriptConnection" then
 									keybindConnection:Disconnect()
-								elseif finity.gs["ContextActionService"] then
+								end
+								if finity.gs["ContextActionService"] then
 									finity.gs["ContextActionService"]:UnbindAction("FinityKeybindBtn_" .. tostring(keybindKey))
 								end
 								keybindConnection = nil
@@ -2311,17 +2305,18 @@ function finity.new(isdark, gprojectName, thinProject)
 							if keybindKey then
 								local lastPressedTime = 0
 								
-								-- Use ContextActionService to override game keybinds
+								-- Use ContextActionService with high priority to override game keybinds
 								if finity.gs["ContextActionService"] then
 									local actionName = "FinityKeybindBtn_" .. tostring(keybindKey)
-									finity.gs["ContextActionService"]:BindAction(actionName, function(actionName, inputState, inputObject)
+									-- Bind with high priority (2000) to override game actions
+									finity.gs["ContextActionService"]:BindActionAtPriority(actionName, function(actionName, inputState, inputObject)
 										-- Check if chat is open
 										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
 										if chatBox then return Enum.ContextActionResult.Pass end
 										
 										if inputState == Enum.UserInputState.Begin then
 											local currentTime = tick()
-											if currentTime - lastPressedTime > 0.1 then
+											if currentTime - lastPressedTime > 0.15 then
 												lastPressedTime = currentTime
 												if callback then
 													local s, e = pcall(function()
@@ -2329,28 +2324,23 @@ function finity.new(isdark, gprojectName, thinProject)
 													end)
 													if not s then warn("error: ".. e) end
 												end
+												-- Sink the input to prevent game from processing it
 												return Enum.ContextActionResult.Sink
 											end
 										end
 										return Enum.ContextActionResult.Pass
-									end, false, true, keybindKey)
+									end, false, Enum.ContextActionPriority.High.Value, keybindKey)
 									keybindConnection = true -- Mark as connected
 								else
-									-- Fallback to RunService if ContextActionService not available
-									local lastPressed = false
-									keybindConnection = finity.gs["RunService"].Heartbeat:Connect(function()
+									-- Fallback: Use InputBegan with immediate connection
+									keybindConnection = finity.gs["UserInputService"].InputBegan:Connect(function(Input, Process)
 										local chatBox = finity.gs["UserInputService"]:GetFocusedTextBox()
-										if chatBox then 
-											lastPressed = false
-											return 
-										end
+										if chatBox then return end
 										
-										local isPressed = finity.gs["UserInputService"]:IsKeyDown(keybindKey)
-										local currentTime = tick()
-										
-										if isPressed and not lastPressed then
-											if currentTime - lastPressedTime > 0.1 then
-												lastPressed = true
+										-- Don't check Process - capture ALL key presses
+										if Input.KeyCode == keybindKey then
+											local currentTime = tick()
+											if currentTime - lastPressedTime > 0.15 then
 												lastPressedTime = currentTime
 												if callback then
 													local s, e = pcall(function()
@@ -2359,8 +2349,6 @@ function finity.new(isdark, gprojectName, thinProject)
 													if not s then warn("error: ".. e) end
 												end
 											end
-										elseif not isPressed then
-											lastPressed = false
 										end
 									end)
 								end
